@@ -8,8 +8,8 @@
     "obra": "Observatório Nacional da Formação em Fisioterapia",
     "descricao": "Sítio estático data-driven com indicadores de acesso territorial, qualidade e cobertura assistencial dos cursos de Fisioterapia no Brasil: formulação e cálculo dos índices ICT, E, IAF, ICAFT e ICRE, catálogo de indicadores, textos e desenho editorial."
   },
-  "registrado_em": "2026-11-23T18:11:32+00:00",
-  "git_commit_ancora": null,
+  "registrado_em": "2026-11-23T19:57:31+00:00",
+  "git_commit_ancora": "d7e0b9fb859c685cde1619d657d743835b59ab49",
   "algoritmo": "SHA-256 sobre o conteúdo com fim de linha normalizado em LF",
   "fundamento": "Lei 9.610/1998 (direitos autorais) e Lei 9.609/1998 (programa de computador). O resumo combinado é impressão digital única do conjunto; o commit Git ancora a data no histórico versionado.",
   "como_verificar": [
@@ -22,9 +22,9 @@
   ],
   "natureza": "Declaração datada de conteúdo, com anterioridade ancorada no histórico do repositório. Permite comparar uma cópia com o original arquivo a arquivo. Não é registro em cartório nem depósito no INPI, e não substitui nenhum dos dois.",
   "escopo": "Apenas material autoral: código, textos, templates e o desenho dos índices. Não inclui os dados públicos (INEP, DATASUS, IBGE), que pertencem às respectivas fontes, nem bibliotecas de terceiros.",
-  "n_arquivos": 39,
-  "bytes_totais": 461064,
-  "sha256_combinado": "0d8a1ea9b7a8e579ad2775f58594e9b51a4d88b73c4537980020b5273b0ab183",
+  "n_arquivos": 40,
+  "bytes_totais": 475280,
+  "sha256_combinado": "d1537f22afb3a7668dfe97773e3c2ee1f61bcd12a008dcfd4769d28c1e33de3d",
   "arquivos": [
     {
       "arquivo": "README.md",
@@ -112,9 +112,9 @@
     },
     {
       "arquivo": "site/build.py",
-      "bytes": 27824,
-      "linhas": 650,
-      "sha256": "c6327fd3eefbcb83bf78076e9e63348e2be4a2e2af03effd767d6a374f1e4443"
+      "bytes": 28325,
+      "linhas": 657,
+      "sha256": "ca53a6cae5f9973c438851d1b4358953540be502af856c0164218f94b4601562"
     },
     {
       "arquivo": "site/catalogo.py",
@@ -196,9 +196,9 @@
     },
     {
       "arquivo": "site/templates/serie.html.j2",
-      "bytes": 6474,
-      "linhas": 196,
-      "sha256": "78fa680a4cd81c3ffba605512136fa7db99f7fc43dfcea30ad837c6d2d0aabb6"
+      "bytes": 6919,
+      "linhas": 202,
+      "sha256": "1be2e88a36ffa17b95a6e7e608b3aff6971dc362916bfa261f677f526c250a55"
     },
     {
       "arquivo": "site/templates/uf.html.j2",
@@ -220,9 +220,9 @@
     },
     {
       "arquivo": "tests/test_acessibilidade.py",
-      "bytes": 15446,
-      "linhas": 368,
-      "sha256": "a10f75feb5ba86759be6ff0bdd32f333e67e49c0d8608f5004ce4fb640ede9d2"
+      "bytes": 18114,
+      "linhas": 443,
+      "sha256": "8428cafc4f852663aa8dd865ca9f83a3b68fed32f081a5ee1b72bc03c6d05975"
     },
     {
       "arquivo": "tests/test_catalogo.py",
@@ -235,6 +235,12 @@
       "bytes": 6213,
       "linhas": 179,
       "sha256": "0d4d37a0c85c2d6d8c053d9f51e041aaa5d31ed1e6a3da113b3153284c9f12d4"
+    },
+    {
+      "arquivo": "tests/test_conteudo_publicado.py",
+      "bytes": 10602,
+      "linhas": 254,
+      "sha256": "bce263da4c50bd508543b07b2b906c9180f0f7b5c520b92ca2ed5033d3bce805"
     },
     {
       "arquivo": "tests/test_links.py",
