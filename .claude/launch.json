@@ -3,8 +3,14 @@
   "configurations": [
     {
       "name": "observatorio-fisio",
-      "runtimeExecutable": "C:\Users\User\AppData\Local\Programs\Python\Python312\python.exe",
-      "runtimeArgs": ["-m", "http.server", "7374", "--directory", "site/dist"],
+      "runtimeExecutable": "C:/Users/User/AppData/Local/Programs/Python/Python312/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "7374",
+        "--directory",
+        "site/dist"
+      ],
       "port": 7374,
       "autoPort": false
     }
