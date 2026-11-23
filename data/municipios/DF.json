@@ -1,0 +1,33 @@
+{
+ "uf": "DF",
+ "municipios": [
+  {
+   "codigo": "5300108",
+   "nome": "Brasília",
+   "uf": "DF",
+   "vagas_presencial": 5169,
+   "cursos_presencial": 22,
+   "n_ies": 18,
+   "matriculas": 5767,
+   "matriculas_ead": 1926,
+   "concluintes": 815,
+   "polos_ead": 27,
+   "tem_curso_presencial": true,
+   "fisioterapeutas_sus": 1608,
+   "estabelecimentos_servico_fisio": 64,
+   "estabelecimentos_servico_fisio_total": 613,
+   "servicos_fisio": [
+    "126/001",
+    "126/002",
+    "126/003",
+    "126/004",
+    "126/005",
+    "126/006",
+    "126/007",
+    "126/008",
+    "135/003",
+    "135/011"
+   ]
+  }
+ ]
+}

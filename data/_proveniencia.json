@@ -1,0 +1,93 @@
+{
+  "gerado_em": "2026-11-23",
+  "fontes": {
+    "censo": {
+      "presente": true,
+      "fonte": "Censo da Educação Superior (INEP)",
+      "url": "https://download.inep.gov.br/microdados/microdados_censo_da_educacao_superior_2024.zip",
+      "ano_censo": 2024,
+      "membro_cursos": "microdados_censo_da_educacao_superior_2024/dados/MICRODADOS_CADASTRO_CURSOS_2024.CSV",
+      "membro_ies": "microdados_censo_da_educacao_superior_2024/dados/MICRODADOS_ED_SUP_IES_2024.CSV",
+      "rotulo_cine": "Fisioterapia",
+      "md5_publicado": "dbe25e67857aa68b12beaeffa194f53f *MICRODADOS_CADASTRO_IES_2024.csv\r\n4ada15841c698a47ec19d6cb53ac2c13 *MICRODADOS_CADASTRO_CURSOS_2024.csv",
+      "linhas_cadastro": 720349,
+      "linhas_curso": 5870,
+      "ies_cadastradas": 2561,
+      "extraido_em": "2026-11-23"
+    },
+    "cpc": {
+      "presente": true,
+      "fonte": "Conceito Preliminar de Curso (INEP)",
+      "url": "https://download.inep.gov.br/educacao_superior/indicadores/resultados/2023/CPC_2023.xlsx",
+      "ciclo": "2023",
+      "area_avaliacao": "FISIOTERAPIA",
+      "match": "igualdade sobre o rótulo normalizado, nunca substring",
+      "ponderacao": "média ponderada por concluintes participantes, 3 casas",
+      "componente_q_do_iaf": "CPC (Faixa), escala 1 a 5",
+      "cursos_avaliados": 711,
+      "ufs_avaliadas": 27,
+      "extraido_em": "2026-11-23"
+    },
+    "cnes": {
+      "presente": true,
+      "fonte": "Cadastro Nacional de Estabelecimentos de Saúde (CNES/DATASUS)",
+      "arquivo": "BASE_DE_DADOS_CNES_202610.ZIP",
+      "url": "ftp://ftp.datasus.gov.br/cnes/BASE_DE_DADOS_CNES_202610.ZIP",
+      "competencia": "202610",
+      "cbo_familia": "2236",
+      "cbo_criterio": "Lista explícita das nove ocupações de fisioterapeuta, não o prefixo da família: a 2236 inclui 2236I1 (técnico em orientação e mobilidade de cegos e deficientes visuais), que não é fisioterapeuta. A família é reconferida contra a tabela de domínio a cada execução.",
+      "cbo_ocupacoes": [
+        "223605",
+        "223625",
+        "223630",
+        "223635",
+        "223640",
+        "223645",
+        "223650",
+        "223655",
+        "223660"
+      ],
+      "cbo_excluidos_da_familia": [
+        "2236I1"
+      ],
+      "servicos_considerados": {
+        "126": "Serviço de Fisioterapia (todas as classificações)",
+        "135/003": "Reabilitação física",
+        "135/011": "Atenção fisioterapêutica"
+      },
+      "servico_criterio_sus": "A rede especializada conta estabelecimentos que ofertam o serviço AO SUS (CO_AMBULATORIAL_SUS ou CO_HOSPITALAR_SUS = 1). O total declarado, que inclui a clínica privada, sai no campo *_total: serviço declarado no cadastro não é serviço público.",
+      "st_ativo_sn_nao_filtra": "A coluna ST_ATIVO_SN de rlEstabServClass vem vazia em todas as linhas deste export, então não há como excluir serviço marcado como inativo. O filtro que existia aqui lia coluna sempre em branco e nunca excluiu nada; agora a ausência é contada e declarada em vez de passar por filtro que funciona.",
+      "cer_indisponivel": "A habilitação de Centro Especializado em Reabilitação não é publicada nesta base: os códigos existem em tbSubGruposHabilitacao (2208-2211, 8223-8225) mas nenhuma tabela-fato os liga a estabelecimento ou município. O indicador de CER não existe e não foi substituído por proxy.",
+      "extraido_em": "2026-11-23",
+      "diagnostico": {
+        "vinculos_fisioterapia": 199825,
+        "vinculos_em_estabelecimento_desabilitado": 145,
+        "vinculos_sem_cadastro": 0,
+        "servicos_fisioterapicos": 126445,
+        "servicos_com_situacao_preenchida": 0,
+        "st_ativo_sn_vazio_no_export": true,
+        "servicos_em_estabelecimento_desabilitado": 18137,
+        "servicos_sem_cadastro": 0
+      }
+    },
+    "ibge_municipios": {
+      "presente": true,
+      "fonte": "https://servicodados.ibge.gov.br/api/v1/localidades/municipios?view=nivelado",
+      "total": 5571
+    },
+    "ibge_populacao": {
+      "presente": true,
+      "agregado": 6579,
+      "variavel": 9324,
+      "nivel": "N3",
+      "ano": "2026"
+    }
+  },
+  "limitacoes_conhecidas": [
+    "A habilitação de Centro Especializado em Reabilitação (CER) não é publicada na base do CNES; o indicador não existe e não foi substituído por aproximação. Os códigos estão na tabela de domínio — inclusive o 2208, que é a modalidade FÍSICA e seria o mais específico para a Fisioterapia —, mas nenhuma das 38 tabelas de relação do ZIP liga habilitação a estabelecimento.",
+    "Infraestrutura fisioterapêutica não é medível: o catálogo de instalações físicas do CNES tem 66 entradas e nenhuma é de fisioterapia ou reabilitação. A fonte não distingue a sala.",
+    "A Fisioterapia tem oferta presencial nas 27 unidades da federação e curso avaliado no CPC 2023 em todas elas. Nenhum indicador fica nulo por ausência de oferta ou de avaliação — o que não torna a regra do nulo decorativa: ela continua decidindo a cobertura assistencial, município a município, e o IDD, ausente em 34 dos 711 cursos avaliados.",
+    "A rede especializada conta apenas estabelecimentos que ofertam o serviço AO SUS. O total declarado — que inclui a clínica privada registrada no cadastro — é publicado ao lado, nos campos terminados em `_total`: a distância entre os dois diz quanto da rede especializada do município é acessível pelo SUS.",
+    "A coluna ST_ATIVO_SN de rlEstabServClass vem vazia em todas as linhas deste export do CNES, então não há como excluir serviço marcado como inativo. O filtro que existia no extrator lia coluna sempre em branco e nunca excluiu nada; a limitação passou a ser declarada em vez de disfarçada de filtro."
+  ]
+}
