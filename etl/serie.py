@@ -69,10 +69,15 @@ CAMPOS = [
 # a distância desabou; nulo diz que a categoria deixou de existir. São coisas
 # diferentes, e a diferença é o assunto.
 #
-# `vagas_total` continua: é a capacidade que o Censo registra, com a mesma
-# definição de antes — tudo o que está no cadastro, inclusive o que está em
-# extinção. Separar o que é ativo é trabalho da página, não da série, porque a
-# série existe para comparar e as edições anteriores não distinguiam situação.
+# `vagas_total` é a capacidade ATIVA, a mesma definição que a página publica.
+# Para 2015-2024 isso não muda nada, porque a fonte não distinguia situação de
+# curso; de 2025 em diante a parte encerrada ou em extinção sai na sua própria
+# linha, `vagas_em_extincao`, ao lado. Um nome com dois sentidos em dois
+# artefatos do mesmo projeto já foi tentado aqui e é pior que o problema que
+# resolve: ninguém que lê o número sabe qual dos dois está vendo.
+#
+# A constante abaixo é APLICADA, não apenas documentada: o campo é medido e
+# depois mascarado, e há guarda para a contradição entre as duas coisas.
 CAMPOS_SEM_SENTIDO_APOS_2024 = {
     "vagas_ead": "o Decreto 12.456/2025 extinguiu a modalidade; a variável do "
                  "Censo passou a significar formato de oferta",
@@ -109,7 +114,7 @@ def _agregar_normalizado(z, ano, rotulo, alvo, alvo_ies):
     alvo_norm = normalizar(rotulo)
     ufs = defaultdict(lambda: {
         "vagas_presencial": 0, "vagas_semipresencial": 0,
-        "vagas_em_extincao": 0, "vagas_total": 0,
+        "vagas_ead_ativa": 0, "vagas_em_extincao": 0, "vagas_total": 0,
         "n_cursos_presencial": 0, "matriculas": 0, "concluintes": 0,
         "_ies": set(), "_mun_oferta": set(),
     })
@@ -152,22 +157,69 @@ def _agregar_normalizado(z, ano, rotulo, alvo, alvo_ies):
             else:
                 d["vagas_em_extincao"] += vagas
             if formato == "1":
-                d["n_cursos_presencial"] += 1
+                # ATIVO nos tres, e nao so nas vagas.
+                #
+                # A primeira versao contava curso e municipio sem olhar a
+                # situacao, e so as vagas separavam. O resultado foi um
+                # 927 na serie contra 923 na pagina, e um 395 contra 396,
+                # com o mesmo nome de campo nos dois artefatos — exatamente
+                # o defeito que o comentario de `vagas_total` acima descreve,
+                # repetido quatro linhas abaixo dele.
+                #
+                # Esta funcao so le o esquema normalizado, de 2025 em
+                # diante. As edicoes anteriores passam pelo outro leitor, que
+                # nao tem coluna de situacao para olhar — nelas "curso
+                # presencial" sempre significou o que o cadastro trazia. A
+                # comparacao continua valendo porque o que mudou foi a fonte
+                # passar a declarar o que antes nao declarava; o curso
+                # encerrado de 2025 em diante conta em `n_cursos_em_extincao`,
+                # na pagina.
                 if situacao == "1":
+                    d["n_cursos_presencial"] += 1
                     d["vagas_presencial"] += vagas
-                if cod_mun:
-                    d["_mun_oferta"].add(cod_mun)
+                    if cod_mun:
+                        d["_mun_oferta"].add(cod_mun)
             elif formato == "3" and situacao == "1":
                 d["vagas_semipresencial"] += vagas
+                # O semipresencial OCUPA o municipio: exige presenca, mesmo
+                # que parcial. A pagina conta assim, e dois municipios do
+                # recorte de 2025 so tem oferta semipresencial — contados
+                # aqui, `municipios_oferta` fecha com a pagina em vez de
+                # ficar dois abaixo dela sem explicacao. Nas edicoes
+                # anteriores a categoria nao existia, entao nada muda la.
+                if cod_mun:
+                    d["_mun_oferta"].add(cod_mun)
+            elif formato == "2" and situacao == "1":
+                d["vagas_ead_ativa"] += vagas
 
     polos_reg, polos_mun = _polos_da_fatia(ano, rotulo)
+
+    # A capacidade a distância AINDA É MEDIDA, mesmo quando não é publicada.
+    #
+    # Medir e mascarar são passos separados de propósito: é a medição que
+    # permite a guarda abaixo dizer se a decisão de não publicar continua
+    # verdadeira nesta edição. Um `None` escrito à mão não sabe se o que ele
+    # esconde é zero ou seiscentas vagas.
+    medido_ead = sum(d["vagas_ead_ativa"] for d in ufs.values())
+    for campo, motivo in CAMPOS_SEM_SENTIDO_APOS_2024.items():
+        if campo == "vagas_ead" and medido_ead:
+            raise SystemExit(
+                f"[ERRO] `vagas_ead` está declarado sem sentido após 2024 "
+                f"({motivo}), mas o Censo {ano} traz {medido_ead} vagas a "
+                "distância EM ATIVIDADE neste curso.\n"
+                "As duas afirmações não podem ser verdade ao mesmo tempo. Ou a "
+                "categoria sobreviveu aqui — e então o campo volta a ser "
+                "publicado, com nota de não comparabilidade —, ou a leitura "
+                "está errada. Escolher em silêncio é que não serve.")
 
     saida = {}
     for sigla, d in ufs.items():
         saida[sigla] = {
             "vagas_presencial": d["vagas_presencial"],
-            # nulo, não zero: ver CAMPOS_SEM_SENTIDO_APOS_2024
-            "vagas_ead": None,
+            # Medido acima; nulo aqui porque está em
+            # CAMPOS_SEM_SENTIDO_APOS_2024, com o motivo escrito lá.
+            "vagas_ead": (None if "vagas_ead" in CAMPOS_SEM_SENTIDO_APOS_2024
+                          else d["vagas_ead_ativa"]),
             "vagas_semipresencial": d["vagas_semipresencial"],
             "vagas_em_extincao": d["vagas_em_extincao"],
             "vagas_total": d["vagas_total"],

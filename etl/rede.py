@@ -32,6 +32,7 @@ erro regrediu duas vezes no projeto de Farmácia; aqui ele é difícil de comete
 por acidente porque `sondar` nunca devolve booleano puro.
 """
 import io
+import pathlib
 import json
 import socket
 import ssl
@@ -379,6 +380,38 @@ class ZipRemotoHTTP(ZipRemoto):
                 time.sleep(ESPERA_BASE * (tentativa + 1))
         raise RuntimeError(f"falha ao ler {self.url} em {inicio}+{quantidade}: {ultimo}")
 
+
+class ZipLocal(ZipRemoto):
+    """
+    ZIP lido de um arquivo no disco, com a interface do leitor remoto.
+
+    Existe para o espelho local do Censo: a família de observatórios lê o mesmo
+    arquivo do INEP, e baixá-lo uma vez por repositório é tráfego repetido sem
+    ganho nenhum. Só as duas primitivas mudam; índice, fluxo e fatiamento são
+    os mesmos do `ZipRemoto`, então não há um segundo caminho de leitura para
+    divergir do primeiro.
+    """
+
+    def __init__(self, caminho):
+        super().__init__()
+        self.caminho = pathlib.Path(caminho)
+        if not self.caminho.is_file():
+            raise SystemExit(f"[ERRO] espelho não é arquivo: {self.caminho}")
+
+    def tamanho(self):
+        if self._tamanho is None:
+            self._tamanho = self.caminho.stat().st_size
+        return self._tamanho
+
+    def _ler(self, inicio, quantidade):
+        with open(self.caminho, "rb") as f:
+            f.seek(inicio)
+            dados = f.read(quantidade)
+        if len(dados) != quantidade:
+            raise RuntimeError(
+                f"leitura curta no espelho {self.caminho} em "
+                f"{inicio}+{quantidade}: {len(dados)} bytes")
+        return dados
 
 class ZipRemotoFTP(ZipRemoto):
     """ZIP lido por RETR com REST. Usado no DATASUS."""

@@ -56,7 +56,7 @@ import unicodedata
 from datetime import date
 from pathlib import Path
 
-from rede import ZipRemotoHTTP, sondar
+from rede import ZipLocal, ZipRemotoHTTP, sondar, tamanho_remoto
 
 REPO = Path(__file__).parent.parent
 DADOS = REPO / "etl" / "dados"
@@ -119,29 +119,93 @@ def slug(texto):
     return re.sub(r"[^a-z0-9]+", "-", s).strip("-")
 
 
-def abrir_censo(ano):
-    url, situacao = url_do_censo(ano)
-    if url is None:
-        tentados = "\n  ".join(urls_do_censo(ano))
-        if situacao is None:
-            raise SystemExit(
-                f"[ERRO] não consegui verificar a edição {ano} do Censo (falha "
-                f"de rede). Tentei:\n  {tentados}\n"
-                "Falha de rede não é ausência: tente de novo em vez de "
-                "concluir que a edição não existe.")
+def espelho_do_ano(caminho, ano):
+    """
+    O arquivo do espelho que corresponde à edição pedida.
+
+    Aceita o ZIP direto ou um diretório que o contenha. O nome TEM de casar com
+    um padrão conhecido daquele ano: um espelho de outra edição publicaria o
+    ano errado com toda a proveniência parecendo certa.
+    """
+    p = Path(caminho)
+    nomes = [padrao.format(ano=ano) for padrao in PADROES_CENSO]
+    if p.is_dir():
+        for nome in nomes:
+            if (p / nome).is_file():
+                return p / nome
         raise SystemExit(
-            f"[ERRO] edição {ano} do Censo não encontrada. Tentei:\n  {tentados}\n"
-            "Se o INEP renomeou o arquivo outra vez, acrescente o padrão novo "
-            "em PADROES_CENSO — não troque o que já está lá, porque os anos "
-            "anteriores continuam com o nome antigo.")
-    z = ZipRemotoHTTP(url)
+            f"[ERRO] nenhum ZIP do Censo {ano} em {p}. Procurei:\n  "
+            + "\n  ".join(nomes))
+    if p.name not in nomes:
+        raise SystemExit(
+            f"[ERRO] o espelho {p.name} não é um nome conhecido do Censo {ano}.\n"
+            "Nomes aceitos:\n  " + "\n  ".join(nomes) + "\n"
+            "Renomear o arquivo para passar daqui publicaria a edição errada "
+            "com a proveniência parecendo correta.")
+    return p
+
+
+def abrir_censo(ano, espelho=None):
+    """
+    Abre o ZIP da edição pedida e devolve (z, url, alvo_curso, alvo_ies, origem).
+
+    `origem` é a parte da proveniência que diz DE ONDE os bytes vieram. Ela
+    nunca é omitida: um conjunto gerado de espelho não conferido tem de dizer
+    isso de si mesmo.
+    """
+    url, situacao = url_do_censo(ano)
+    if espelho:
+        local = espelho_do_ano(espelho, ano)
+        bytes_locais = local.stat().st_size
+        if url is None:
+            # Sem rede não há com o que comparar. O espelho é lido, e a
+            # proveniência diz que a conferência não aconteceu -- silenciar a
+            # diferença entre "conferido" e "não deu para conferir" seria
+            # exatamente o erro que o verificador de fontes já cometeu.
+            url = BASE_CENSO + local.name
+            conferido, publicado = None, None
+        else:
+            publicado = tamanho_remoto(url)
+            if publicado and publicado != bytes_locais:
+                raise SystemExit(
+                    "[ERRO] o espelho não é o arquivo publicado.\n"
+                    f"  espelho:   {local} ({bytes_locais} bytes)\n"
+                    f"  publicado: {url} ({publicado} bytes)\n"
+                    "Baixe o arquivo outra vez. Publicar a partir de um "
+                    "espelho que não confere é publicar sem proveniência.")
+            conferido = bool(publicado)
+        print(f"[CENSO] lendo do espelho local: {local}")
+        print("[CENSO] conferência de tamanho contra o publicado: "
+              + ("ok" if conferido else "NÃO FOI POSSÍVEL (sem rede)"))
+        z = ZipLocal(local)
+        origem = {"lido_de": "espelho local",
+                  "espelho": str(local),
+                  "espelho_bytes": bytes_locais,
+                  "espelho_confere_com_publicado": conferido,
+                  "bytes_publicados": publicado}
+    else:
+        if url is None:
+            tentados = "\n  ".join(urls_do_censo(ano))
+            if situacao is None:
+                raise SystemExit(
+                    f"[ERRO] não consegui verificar a edição {ano} do Censo (falha "
+                    f"de rede). Tentei:\n  {tentados}\n"
+                    "Falha de rede não é ausência: tente de novo em vez de "
+                    "concluir que a edição não existe.")
+            raise SystemExit(
+                f"[ERRO] edição {ano} do Censo não encontrada. Tentei:\n  {tentados}\n"
+                "Se o INEP renomeou o arquivo outra vez, acrescente o padrão novo "
+                "em PADROES_CENSO -- não troque o que já está lá, porque os anos "
+                "anteriores continuam com o nome antigo.")
+        z = ZipRemotoHTTP(url)
+        origem = {"lido_de": "INEP por Range"}
     alvo_curso = z.localizar("cadastro_cursos", ".csv") or z.localizar("curso", ".csv")
     alvo_ies = z.localizar("_ies_", ".csv") or z.localizar("ies", ".csv")
     if not alvo_curso:
         raise SystemExit(f"[ERRO] cadastro de cursos não encontrado em {url}")
     if not alvo_ies:
         raise SystemExit(f"[ERRO] cadastro de IES não encontrado em {url}")
-    return z, url, alvo_curso, alvo_ies
+    return z, url, alvo_curso, alvo_ies, origem
 
 
 def esquema_do_zip(z):
@@ -217,7 +281,7 @@ def listar_rotulos(z, alvo_curso, filtro):
     return contagem
 
 
-def extrair(ano, rotulo, rebaixar=False):
+def extrair(ano, rotulo, rebaixar=False, espelho=None):
     """
     Extrai o recorte da edição pedida, no esquema que ela usar.
 
@@ -225,15 +289,16 @@ def extrair(ano, rotulo, rebaixar=False):
     ser removido: a série histórica compara 2021 a 2024, e essas edições só
     existem naquele formato. Apagar o leitor antigo apagaria a série.
     """
-    z, url, alvo_curso, alvo_ies = abrir_censo(ano)
+    z, url, alvo_curso, alvo_ies, origem = abrir_censo(ano, espelho)
     ano_do_membro(alvo_curso, ano)
     DADOS.mkdir(parents=True, exist_ok=True)
     esquema = esquema_do_zip(z)
     print(f"[CENSO] esquema do arquivo: {esquema}")
     if esquema == "normalizado":
         return _extrair_normalizado(z, url, ano, rotulo, alvo_curso, alvo_ies,
-                                    rebaixar=rebaixar)
-    return _extrair_unico(z, url, ano, rotulo, alvo_curso, alvo_ies)
+                                    rebaixar=rebaixar, origem=origem)
+    return _extrair_unico(z, url, ano, rotulo, alvo_curso, alvo_ies,
+                          origem=origem)
 
 
 def _linhas(caminho):
@@ -306,7 +371,7 @@ NIVEL_IES, NIVEL_CURSO, NIVEL_LOCAL = "1", "2", "3"
 
 
 def _extrair_normalizado(z, url, ano, rotulo, alvo_curso, alvo_ies,
-                         rebaixar=False):
+                         rebaixar=False, origem=None):
     """
     Tabelas separadas — edições de 2025 em diante.
 
@@ -450,6 +515,7 @@ def _extrair_normalizado(z, url, ano, rotulo, alvo_curso, alvo_ies,
             "pequenos."),
         "ies_cadastradas": n_ies,
         "extraido_em": date.today().isoformat(),
+        **(origem or {"lido_de": "INEP por Range"}),
     }
     (DADOS / f"_censo_{ano}.json").write_text(
         json.dumps(prov, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -457,7 +523,7 @@ def _extrair_normalizado(z, url, ano, rotulo, alvo_curso, alvo_ies,
     return prov
 
 
-def _extrair_unico(z, url, ano, rotulo, alvo_curso, alvo_ies):
+def _extrair_unico(z, url, ano, rotulo, alvo_curso, alvo_ies, origem=None):
     """Cadastro único com `TP_DIMENSAO` — edições até 2024."""
     alvo_norm = normalizar(rotulo)
     destino = DADOS / f"curso_{slug(rotulo)}_{ano}.csv"
@@ -534,6 +600,7 @@ def _extrair_unico(z, url, ano, rotulo, alvo_curso, alvo_ies):
         "linhas_curso": escritas,
         "ies_cadastradas": n_ies,
         "extraido_em": date.today().isoformat(),
+        **(origem or {"lido_de": "INEP por Range"}),
     }
     (DADOS / f"_censo_{ano}.json").write_text(
         json.dumps(prov, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -549,16 +616,22 @@ def main():
                    help="rótulo CINE EXATO (default: Fisioterapia)")
     p.add_argument("--rebaixar", action="store_true",
                    help="relê as fatias mesmo que já estejam em disco")
+    p.add_argument("--espelho", metavar="CAMINHO",
+                   help="lê o ZIP de um espelho local (arquivo ou diretório) "
+                        "em vez de baixar do INEP; o tamanho é conferido "
+                        "contra o publicado")
     p.add_argument("--listar-rotulos", metavar="TRECHO",
                    help="diagnóstico: lista rótulos CINE contendo TRECHO e sai")
     args = p.parse_args()
 
     if args.listar_rotulos:
-        z, _url, alvo_curso, _ies = abrir_censo(args.ano)
+        z, _url, alvo_curso, _ies, _origem = abrir_censo(
+            args.ano, args.espelho)
         listar_rotulos(z, alvo_curso, args.listar_rotulos)
         return
 
-    extrair(args.ano, args.rotulo, rebaixar=args.rebaixar)
+    extrair(args.ano, args.rotulo, rebaixar=args.rebaixar,
+            espelho=args.espelho)
 
 
 if __name__ == "__main__":
