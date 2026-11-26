@@ -317,6 +317,343 @@ def agregar(linhas, ies, mun_por_uf, nomes_municipio, populacao):
     return ufs, _fechar_municipios(municipios, nomes_municipio), sem_localizacao
 
 
+# --------------------------------------------------------------------------- #
+# Esquema normalizado — Censo 2025 em diante
+# --------------------------------------------------------------------------- #
+#
+# O QUE MUDOU, E O QUE ISSO FAZ COM O MÉTODO
+#
+# Até 2024 o Censo vinha num cadastro só, com uma linha por curso E POR CAMADA
+# (`TP_DIMENSAO`: presencial, polo, sede, sem localização). A camada era o eixo
+# de tudo: dizia onde somar a vaga, de quem era a matrícula, e qual UF recebia
+# a EaD.
+#
+# Em 2025 a coluna sumiu. Cada curso tem uma linha, com a localização do seu
+# LOCAL DE OFERTA; os polos foram para uma tabela própria; o perfil do aluno
+# para outra. E duas colunas novas mudam o que "oferta" quer dizer:
+#
+#   TP_SITUACAO          1 em atividade | 2 extinto | 3 em extinção
+#   TP_MODALIDADE_ENSINO 1 presencial   | 2 a distância | 3 semipresencial
+#
+# A segunda MUDOU DE SENTIDO, e o dicionário do INEP diz isso com todas as
+# letras: "Até 2024, a variável representa a modalidade de ensino do curso. A
+# partir de 2025, passa a representar o formato de oferta, conforme o Marco
+# Regulatório (Decreto 12.456/2025)."
+#
+# POR QUE AS CONTAS SE SEPARAM EM DUAS
+#
+# Medido na Fisioterapia 2025: os 117 cursos a distância são exatamente os 117
+# "em extinção" — o decreto proibiu a graduação em Fisioterapia inteiramente a
+# distância. Mas eles não fecharam: receberam 57.037 ingressantes em vaga nova,
+# MAIS que os 46.213 dos cursos em atividade, e ainda têm 103.118 matriculados.
+#
+# Daí a regra que este módulo aplica, e que não é simetria à toa:
+#
+#   · CAPACIDADE (vagas) separa por situação. Vaga de curso em extinção não é
+#     oferta futura, e somá-la à oferta ativa anunciaria uma capacidade que a
+#     lei já encerrou.
+#   · PESSOAS (matrículas, ingressantes, concluintes) NÃO se filtram por
+#     situação. São gente que está matriculada agora e vai se formar; descartá-
+#     las publicaria um país com um terço menos de estudantes de Fisioterapia
+#     do que ele tem.
+#
+# As duas leituras saem lado a lado, em campos de nome diferente, como a
+# cobertura do CNES já faz com rede pública e rede declarada.
+
+FORMATO_PRESENCIAL = "1"
+FORMATO_EAD = "2"
+FORMATO_SEMIPRESENCIAL = "3"
+
+SITUACAO_ATIVIDADE = "1"
+SITUACAO_EXTINTO = "2"
+SITUACAO_EXTINCAO = "3"
+
+
+def carregar_fatia(nome, ano, obrigatoria=True):
+    caminho = DADOS / f"{nome}_{ano}.csv"
+    if not caminho.exists():
+        if obrigatoria:
+            raise SystemExit(
+                f"[ERRO] {caminho} ausente. Rode etl/extrair_censo.py --ano {ano}.")
+        return []
+    with open(caminho, encoding="utf-8") as f:
+        return list(csv.DictReader(f, delimiter=";"))
+
+
+def _perfil_por_curso(alunos):
+    """
+    Soma o perfil por `CO_CURSO`, a partir da tabela de aluno.
+
+    A tabela traz a MESMA pessoa em três níveis de agregação, e o extrator já
+    guardou só o nível de curso. Esta função confere isso de novo em vez de
+    confiar: se um dia a fatia vier com outro nível junto, a soma dobraria sem
+    nada avisar, e dobrar silenciosamente é o defeito mais caro que existe num
+    pipeline de estatística.
+    """
+    niveis = {(l.get("TP_NIVEL_AGREGACAO") or "").strip() for l in alunos}
+    if niveis - {"2"}:
+        raise SystemExit(
+            f"[ERRO] a fatia de aluno traz os níveis de agregação {sorted(niveis)}; "
+            "só o nível 2 (curso) pode ser somado. Reextraia.")
+    por_curso = defaultdict(lambda: defaultdict(int))
+    for l in alunos:
+        alvo = por_curso[(l.get("CO_CURSO") or "").strip()]
+        for destino, coluna in (
+                ("_mat_fem", "QT_MAT_FEM"), ("_mat_noturno", "QT_MAT_NOTURNO"),
+                ("_mat_preta", "QT_MAT_PRETA"), ("_mat_parda", "QT_MAT_PARDA"),
+                ("_mat_indigena", "QT_MAT_INDIGENA"),
+                ("_mat_cornd", "QT_MAT_CORND"),
+                ("_mat_financ", "QT_MAT_FINANC"),
+                ("_mat_apoio", "QT_MAT_APOIO_SOCIAL"),
+                ("_mat_reserva", "QT_MAT_RESERVA_VAGA")):
+            alvo[destino] += inteiro(l.get(coluna))
+    return por_curso
+
+
+def agregar_normalizado(cursos, locais, alunos, ies, mun_por_uf,
+                        nomes_municipio, populacao):
+    ufs = {uf: _uf_vazia_normalizado(uf, mun_por_uf.get(uf, 0), populacao.get(uf))
+           for uf in mun_por_uf}
+    vagas_ies = defaultdict(lambda: defaultdict(int))
+    vagas_mantenedora = defaultdict(lambda: defaultdict(int))
+    municipios = defaultdict(lambda: defaultdict(lambda: {
+        "vagas_presencial": 0, "cursos_presencial": 0, "matriculas": 0,
+        "concluintes": 0, "polos_ead": 0, "matriculas_ead": 0, "ies": set(),
+    }))
+    sem_localizacao = {"linhas": 0, "matriculas": 0, "concluintes": 0,
+                       "ingressos": 0, "vagas": 0, "formatos": {}}
+    perfil = _perfil_por_curso(alunos)
+    uf_do_curso = {}
+    # Quanto da capacidade foi colocado numa UF pela sede da mantenedora, e
+    # nao pelo local de oferta. Publicado: e uma atribuicao, nao uma medida.
+    por_ies = {"linhas": 0, "vagas": 0, "matriculas": 0}
+
+    for linha in cursos:
+        formato = (linha.get("TP_MODALIDADE_ENSINO") or "").strip()
+        situacao = (linha.get("TP_SITUACAO") or "").strip()
+        uf = (linha.get("SG_UF_LO") or "").strip().upper() or None
+        cod_mun = (linha.get("CO_MUNICIPIO_LO") or "").strip()
+        cod_ies = (linha.get("CO_IES") or "").strip()
+        cod_curso = (linha.get("CO_CURSO") or "").strip()
+
+        vagas = inteiro(linha.get("QT_VAGA_TOTAL"))
+        matriculas = inteiro(linha.get("QT_MATRICULA_TOTAL"))
+        concluintes = inteiro(linha.get("QT_CONCLUINTE_TOTAL"))
+        ingressos = inteiro(linha.get("QT_INGRESSO_TOTAL"))
+
+        # SEM LOCAL DE OFERTA: cai para a UF-sede da mantenedora.
+        #
+        # Medido na Fisioterapia 2025: 29 cursos vêm sem `SG_UF_LO`, e eles
+        # carregam 199.724 vagas — 35% da capacidade do país. Dezenove sao a
+        # distancia e dez semipresenciais, ou seja, justamente a oferta que
+        # nao tem endereco proprio.
+        #
+        # Descartá-los seria publicar um Brasil com dois tercos da capacidade
+        # que tem. O modelo de 2024 ja resolvia isso: a linha de sede vinha
+        # sem `SG_UF` e era atribuida por `CO_IES` -> `SG_UF_IES`. A regra
+        # continua a mesma; o que mudou foi o nome da coluna.
+        #
+        # O que nao se faz e inventar: se a IES tambem nao tem UF, a linha vai
+        # para `sem_localizacao` e aparece na pagina, em vez de ser rateada.
+        # SO A OFERTA SEM ENDERECO PROPRIO PODE SER ATRIBUIDA.
+        #
+        # O modelo de 2024 distinguia duas coisas que em 2025 viraram a mesma
+        # ausencia de `SG_UF_LO`:
+        #
+        #   TP_DIMENSAO 3 (sede de EaD) vinha sem UF POR NATUREZA, e era
+        #     atribuida pela mantenedora. Legitimo: o curso a distancia nao
+        #     tem endereco, e a sede e o lugar que a fonte conhece.
+        #   TP_DIMENSAO 4 (sem localizacao) era a fonte dizendo que NAO SABE
+        #     onde aquilo esta. Atribuir essa por mantenedora e inventar dado,
+        #     e ha teste proibindo desde o ciclo anterior.
+        #
+        # Sem a coluna de dimensao, o que separa os dois casos e o FORMATO: um
+        # curso presencial tem endereco por definicao, entao presencial sem
+        # localizacao e ausencia de informacao, nao oferta deslocalizada.
+        # Medido em 2025: as 29 linhas sem UF sao 19 a distancia e 10
+        # semipresenciais, nenhuma presencial — mas a regra fica escrita, e
+        # nao depende de a proxima edicao ter a mesma sorte.
+        atribuida_pela_ies = False
+        if (not uf or uf not in ufs) and formato != FORMATO_PRESENCIAL:
+            uf_ies = ies.get(cod_ies, {}).get("uf_sede")
+            if uf_ies in ufs:
+                uf = uf_ies
+                atribuida_pela_ies = True
+
+        if not uf or uf not in ufs:
+            if matriculas or concluintes or ingressos or vagas:
+                sem_localizacao["linhas"] += 1
+                sem_localizacao["matriculas"] += matriculas
+                sem_localizacao["concluintes"] += concluintes
+                sem_localizacao["ingressos"] += ingressos
+                sem_localizacao["vagas"] += vagas
+                chave = formato or "(vazio)"
+                sem_localizacao["formatos"][chave] = (
+                    sem_localizacao["formatos"].get(chave, 0) + 1)
+            continue
+
+        uf_do_curso[cod_curso] = uf
+        d = ufs[uf]
+        if atribuida_pela_ies:
+            por_ies["linhas"] += 1
+            por_ies["vagas"] += vagas
+            por_ies["matriculas"] += matriculas
+        ativo = situacao == SITUACAO_ATIVIDADE
+
+        # --- capacidade: separa por situação
+        if ativo:
+            if formato == FORMATO_PRESENCIAL:
+                d["vagas_presencial"] += vagas
+                d["n_cursos_presencial"] += 1
+                d["_ies_presencial"].add(cod_ies)
+            elif formato == FORMATO_SEMIPRESENCIAL:
+                d["vagas_semipresencial"] += vagas
+                d["n_cursos_semipresencial"] += 1
+                d["_ies_presencial"].add(cod_ies)
+            elif formato == FORMATO_EAD:
+                d["vagas_ead"] += vagas
+                d["n_cursos_ead"] += 1
+                d["_ies_ead"].add(cod_ies)
+            if (linha.get("IN_CAPITAL_LO") or "").strip() == "1":
+                d["vagas_capital"] += vagas
+        else:
+            d["vagas_em_extincao"] += vagas
+            d["n_cursos_em_extincao"] += 1
+            d["matriculas_em_extincao"] += matriculas
+            d["ingressos_em_extincao"] += ingressos
+            if formato == FORMATO_EAD:
+                d["_ies_ead"].add(cod_ies)
+
+        # Presencial e semipresencial ocupam o município: os dois exigem
+        # atividade presencial. O curso a distância, não.
+        presente_no_municipio = formato in (FORMATO_PRESENCIAL,
+                                            FORMATO_SEMIPRESENCIAL)
+        if presente_no_municipio and cod_mun:
+            if ativo:
+                d["_municipios_oferta"].add(cod_mun)
+            m = municipios[uf][cod_mun]
+            if ativo and formato == FORMATO_PRESENCIAL:
+                m["vagas_presencial"] += vagas
+                m["cursos_presencial"] += 1
+            m["matriculas"] += matriculas
+            m["concluintes"] += concluintes
+            m["ies"].add(cod_ies)
+
+        # --- pessoas: contam em qualquer situação
+        d["matriculas"] += matriculas
+        d["concluintes"] += concluintes
+        d["ingressos"] += ingressos
+        if formato == FORMATO_PRESENCIAL:
+            d["matriculas_presencial"] += matriculas
+        elif formato == FORMATO_SEMIPRESENCIAL:
+            d["matriculas_semipresencial"] += matriculas
+        elif formato == FORMATO_EAD:
+            d["matriculas_ead"] += matriculas
+
+        for destino, valor in perfil.get(cod_curso, {}).items():
+            d[destino] += valor
+        if (linha.get("TP_REDE") or "").strip() == "1":
+            d["_mat_publica"] += matriculas
+
+        if vagas > 0 and ativo:
+            vagas_ies[uf][cod_ies] += vagas
+            # A mantenedora vem do cadastro de IES, nao da linha do curso: a
+            # tabela de curso de 2025 traz CO_IES e NO_IES, e nenhuma coluna
+            # de mantenedora. A primeira versao deste trecho lia
+            # NO_MANTENEDORA da propria linha, que nao existe ali -- e o
+            # "or NO_IES" logo atras escondia a falta, fazendo o HHI por
+            # mantenedora medir concentracao por INSTITUICAO com outro nome.
+            mant = ies.get(cod_ies, {}).get("mantenedora") or f"IES:{cod_ies}"
+            vagas_mantenedora[uf][mant] += vagas
+
+    # --- polos: tabela própria, contados por LOCAL distinto
+    #
+    # Contar linhas inflaria: a tabela tem uma linha por (local x curso), então
+    # um polo que atende três cursos apareceria três vezes. Contar
+    # CO_LOCAL_OFERTA distinto é correto quer as bandeiras se sobreponham ou
+    # não — e é por isso que a contagem não soma sede com polo.
+    # TRES POPULACOES DIFERENTES ESTAVAM SENDO SOMADAS NUMA SO.
+    #
+    # Medido no recorte de 2025, contando polos por formato e situacao do
+    # curso que eles atendem:
+    #
+    #     a distancia, em extincao   29.006 polos em 3.429 municipios
+    #     semipresencial, ativo      14.173 polos em 3.006 municipios
+    #     presencial, ativo             471 polos em   249 municipios
+    #
+    # A primeira versao somava os tres e publicava "29.921 polos em 3.438
+    # municipios" — numero que misturava a rede que esta morrendo, a que
+    # nasceu no lugar dela, e 471 enderecos de curso PRESENCIAL que a fonte
+    # marca como polo. Os 471 nao sao alcance de oferta a distancia de jeito
+    # nenhum.
+    #
+    # Agora sao duas contagens, pela mesma regra da capacidade: a rede ativa
+    # e a rede em extincao, separadas, e o presencial fora das duas.
+    formato_do_curso = {}
+    situacao_do_curso = {}
+    for linha in cursos:
+        cod = (linha.get("CO_CURSO") or "").strip()
+        formato_do_curso[cod] = (linha.get("TP_MODALIDADE_ENSINO") or "").strip()
+        situacao_do_curso[cod] = (linha.get("TP_SITUACAO") or "").strip()
+
+    polos_por_uf = defaultdict(set)
+    polos_mun_por_uf = defaultdict(set)
+    polos_ext_por_uf = defaultdict(set)
+    polos_ext_mun_por_uf = defaultdict(set)
+    for linha in locais:
+        if (linha.get("IN_LOCAL_OFERTA_POLO") or "").strip() != "1":
+            continue
+        uf = (linha.get("SG_UF_LO") or "").strip().upper()
+        if uf not in ufs:
+            continue
+        cod_curso = (linha.get("CO_CURSO") or "").strip()
+        # Polo de curso presencial nao e alcance de oferta a distancia.
+        if formato_do_curso.get(cod_curso) == FORMATO_PRESENCIAL:
+            continue
+        cod_local = (linha.get("CO_LOCAL_OFERTA") or "").strip()
+        cod_mun = (linha.get("CO_MUNICIPIO_LO") or "").strip()
+        ativo = situacao_do_curso.get(cod_curso) == SITUACAO_ATIVIDADE
+        alvo_polos = polos_por_uf if ativo else polos_ext_por_uf
+        alvo_muns = polos_mun_por_uf if ativo else polos_ext_mun_por_uf
+        alvo_polos[uf].add(cod_local)
+        if cod_mun:
+            alvo_muns[uf].add(cod_mun)
+            if ativo:
+                municipios[uf][cod_mun]["polos_ead"] += 1
+
+    for uf, d in ufs.items():
+        # Contagem de LOCAIS DISTINTOS, nao de linhas: a tabela tem uma linha
+        # por (local x curso), e um polo que atende tres cursos apareceria
+        # tres vezes. E nao se somam bandeiras: `IN_SEDE` e
+        # `IN_LOCAL_OFERTA_POLO` nao sao exclusivos — 367 locais do recorte
+        # sao os dois —, entao somar sede com polo contaria o mesmo endereco
+        # duas vezes.
+        d["ead_polos_registros"] = len(polos_por_uf.get(uf, ()))
+        d["_municipios_polo"] = polos_mun_por_uf.get(uf, set())
+        d["polos_em_extincao"] = len(polos_ext_por_uf.get(uf, ()))
+        d["polos_em_extincao_municipios"] = len(
+            polos_ext_mun_por_uf.get(uf, ()))
+
+    # Quanto da capacidade foi posto numa UF pela sede da mantenedora, e nao
+    # pelo local de oferta. Publicado porque e ATRIBUICAO, nao medida: quem
+    # ler o numero da UF tem direito de saber que parte dele chegou ali por
+    # inferencia.
+    sem_localizacao["atribuidas_pela_sede_da_ies"] = por_ies
+    _fechar(ufs, vagas_ies, vagas_mantenedora)
+    return ufs, _fechar_municipios(municipios, nomes_municipio), sem_localizacao
+
+
+def _uf_vazia_normalizado(uf, mun_total, populacao):
+    d = _uf_vazia(uf, mun_total, populacao)
+    d.update({
+        "vagas_semipresencial": 0, "n_cursos_semipresencial": 0,
+        "matriculas_semipresencial": 0,
+        "vagas_em_extincao": 0, "n_cursos_em_extincao": 0,
+        "matriculas_em_extincao": 0, "ingressos_em_extincao": 0,
+    })
+    return d
+
+
 def _uf_vazia(uf, mun_total, populacao):
     return {
         "uf": uf,
@@ -358,8 +695,22 @@ def _fechar(ufs, vagas_ies, vagas_mantenedora):
         d["n_ies"] = len(ies_pres | ies_ead)
         d["n_mantenedoras"] = len(vagas_mantenedora.get(uf, {})) or None
 
-        d["vagas_total"] = d["vagas_presencial"] + d["vagas_ead"]
+        # Capacidade ATIVA: presencial + semipresencial + a distancia.
+        # O semipresencial e categoria nova (Censo 2025) e vale zero nas
+        # edicoes anteriores, entao a soma serve para as duas. Esquece-lo
+        # tiraria 95.464 vagas do pais em 2025 sem nada acusar, porque o
+        # total continuaria sendo um numero plausivel.
+        d["vagas_total"] = (d["vagas_presencial"] + d["vagas_ead"]
+                            + d.get("vagas_semipresencial", 0))
         d["pct_ead"] = pct(d["vagas_ead"], d["vagas_total"])
+        # Quanto da capacidade ativa NAO e inteiramente presencial. Em 2024
+        # isso e a propria EaD; de 2025 em diante e o semipresencial, que foi
+        # o formato para onde a oferta a distancia migrou. O indicador
+        # atravessa a mudanca de lei porque pergunta a mesma coisa nas duas
+        # edicoes: que fatia da oferta nao exige presenca integral.
+        d["pct_nao_presencial"] = pct(
+            d["vagas_ead"] + d.get("vagas_semipresencial", 0),
+            d["vagas_total"])
         d["vagas_por_100k"] = (
             round(100_000 * d["vagas_total"] / d["populacao"], 1)
             if d["populacao"] else None)
@@ -433,8 +784,21 @@ def main():
     ies = carregar_ies(args.ano)
     mun_por_uf, nomes, populacao, ano_pop = contexto_ibge()
 
-    ufs, municipios, sem_localizacao = agregar(
-        linhas, ies, mun_por_uf, nomes, populacao)
+    # Qual leitor usar vem da PROVENIÊNCIA, que o extrator gravou a partir do
+    # que havia dentro do zip — não de uma comparação com o ano. Ano é
+    # calendário; esquema é fato do arquivo, e foi o arquivo que mudou.
+    esquema = prov_censo.get("esquema", "unico")
+    print(f"[INGESTAO] esquema: {esquema}")
+    if esquema == "normalizado":
+        locais = carregar_fatia("local_oferta_fisioterapia", args.ano)
+        alunos = carregar_fatia("aluno_fisioterapia", args.ano)
+        print(f"[INGESTAO] {len(linhas)} cursos, {len(locais)} locais de "
+              f"oferta, {len(alunos)} linhas de aluno (nível curso)")
+        ufs, municipios, sem_localizacao = agregar_normalizado(
+            linhas, locais, alunos, ies, mun_por_uf, nomes, populacao)
+    else:
+        ufs, municipios, sem_localizacao = agregar(
+            linhas, ies, mun_por_uf, nomes, populacao)
 
     com_presencial = [u for u, d in ufs.items() if d["tem_oferta_presencial"]]
     sem_presencial = sorted(set(ufs) - set(com_presencial))

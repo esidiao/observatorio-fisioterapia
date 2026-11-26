@@ -75,7 +75,8 @@ CODIGO_IBGE = {
 # descoberta mais forte do observatório.
 EIXOS_CORRELACAO = [
     "ICT", "IAF", "ICAFT", "ICRE", "CPC_cont", "IDD", "ENADE_cont",
-    "vagas_total", "vagas_por_100k", "pct_ead", "HHI_mantenedora",
+    "vagas_total", "vagas_por_100k", "pct_ead", "pct_nao_presencial",
+    "HHI_mantenedora",
     "cobertura_municipal", "taxa_conclusao", "pct_doc_doutores",
     "pct_rede_publica", "populacao",
 ]
@@ -216,7 +217,38 @@ def normalizar(valores, maior_melhor):
 # Análises
 # --------------------------------------------------------------------------- #
 
+def eixos_sem_variancia(ufs, eixos):
+    """
+    Os eixos que valem o mesmo em toda UF, com o valor constante.
+
+    Medido a cada build em vez de listado à mão: a `pct_ead` era o eixo mais
+    forte deste observatório até o Censo 2024 e passou a valer zero nas 27 UFs
+    no de 2025, quando o Decreto 12.456/2025 extinguiu a modalidade. Nenhuma
+    lista de exclusões escrita à mão acompanharia essa virada — quem troca o
+    ano do Censo não vai lembrar de reescrever a lista.
+    """
+    constantes = {}
+    for eixo in eixos:
+        valores = [ufs[s].get(eixo) for s in ufs]
+        presentes = {v for v in valores if v is not None}
+        if len(presentes) == 1:
+            constantes[eixo] = presentes.pop()
+        elif not presentes:
+            constantes[eixo] = None
+    return constantes
+
+
 def matriz_correlacao(ufs, eixos):
+    # Variância zero não dá correlação fraca: dá correlação indefinida. O eixo
+    # constante sai da matriz e o motivo é publicado, em vez de virar uma
+    # célula vazia que o leitor interpreta como "não mediram".
+    constantes = eixos_sem_variancia(ufs, eixos)
+    if constantes:
+        for eixo, valor in sorted(constantes.items()):
+            print(f"[BUILD] eixo fora da matriz: {eixo} — todas as UFs valem "
+                  f"{valor!r}, sem variância a correlacionar")
+        eixos = [e for e in eixos if e not in constantes]
+
     siglas = sorted(ufs)
     series = {k: [ufs[s].get(k) for s in siglas] for k in eixos}
     celulas = []
@@ -401,6 +433,19 @@ def construir(caminho_dados, saida, templates):
         # troca de fonte e vira a primeira coisa errada que o leitor vê.
         "ufs_avaliadas": sum(1 for d in ufs.values()
                              if d.get("n_cursos_avaliados")),
+        # Campos que só existem a partir do Censo 2025. `soma` devolve None
+        # quando o campo não está no conjunto, e é por isso que eles podem
+        # ficar aqui sem condicional: numa edição que não os tem, o template
+        # simplesmente não os mostra, em vez de mostrar zero — que seria
+        # afirmar que não há curso semipresencial, quando o certo é que a
+        # categoria não existia.
+        "vagas_semipresencial": soma("vagas_semipresencial"),
+        "n_cursos_semipresencial": soma("n_cursos_semipresencial"),
+        "matriculas_semipresencial": soma("matriculas_semipresencial"),
+        "vagas_em_extincao": soma("vagas_em_extincao"),
+        "n_cursos_em_extincao": soma("n_cursos_em_extincao"),
+        "matriculas_em_extincao": soma("matriculas_em_extincao"),
+        "ingressos_em_extincao": soma("ingressos_em_extincao"),
         "municipios_com_fisioterapeuta": soma("municipios_com_fisioterapeuta"),
         "municipios_com_servico_fisio": soma("municipios_com_servico_fisio"),
         "municipios_com_servico_fisio_total": soma(

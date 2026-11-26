@@ -23,6 +23,42 @@
       subestimaria o alcance; publicar só o total esconderia que quase todo
       esse alcance é EaD. A manchete que informa é a que mostra a diferença.
     #}
+    {% if panorama.n_cursos_em_extincao %}
+    {#
+      Ramo da edição em que a lei mudou. A manchete de antes dizia a distância
+      entre o alcance presencial e o alcance por polo, porque a EaD era 62% da
+      capacidade. Com a modalidade extinta por decreto, repetir aquela frase
+      descreveria um país que acabou — então o que a manchete carrega agora é
+      a própria ruptura, e os dois lados dela: o que foi encerrado e quanta
+      gente continua lá dentro.
+    #}
+    <h1 class="heroi-manchete">
+      A formação em Fisioterapia inteiramente a distância foi encerrada por
+      decreto — e ainda tem
+      <strong>{{ panorama.matriculas_em_extincao | numero }}</strong>
+      estudantes matriculados nos
+      <strong>{{ panorama.n_cursos_em_extincao | numero }}</strong>
+      cursos encerrados ou em extinção.
+    </h1>
+    <p class="heroi-lede">
+      A capacidade ativa é de {{ panorama.vagas_total | numero }} vagas anuais
+      {% if panorama.ufs_sem_oferta %}
+      em {{ panorama.n_ufs_com_oferta }} das 27 unidades da federação —
+      {{ panorama.ufs_sem_oferta | join(', ') }} não têm nenhum curso presencial.
+      {% else %}
+      nas {{ panorama.n_ufs_com_oferta }} unidades da federação, sem exceção.
+      {% endif %}
+      {{ panorama.vagas_presencial | numero }} são presenciais e
+      {{ panorama.vagas_semipresencial | numero }} semipresenciais, formato
+      criado pelo mesmo Marco Regulatório de 2025. Nenhuma é inteiramente a
+      distância.
+      {% if panorama.ingressos_em_extincao %}
+      Ainda assim, {{ panorama.ingressos_em_extincao | numero }} pessoas
+      ingressaram neste ano em curso já declarado em extinção: o encerramento
+      é um processo com prazo, não uma porta que fechou.
+      {% endif %}
+    </p>
+    {% else %}
     <h1 class="heroi-manchete">
       A Fisioterapia tem curso presencial em
       <strong>{{ panorama.municipios_oferta | numero }}</strong>
@@ -46,6 +82,7 @@
       {{ panorama.polos_registros | numero }} polos.
       {% endif %}
     </p>
+    {% endif %}
     <p class="heroi-nota">
       Este observatório não estima nada. Onde não há fonte oficial para um
       recorte, a página diz <em>sem dados</em> — e o mapa fica cinza.
@@ -59,8 +96,10 @@
     <div class="kpi">
       <span class="kpi-valor">{{ panorama.vagas_total | numero }}</span>
       <span class="kpi-rotulo">Vagas anuais</span>
-      <span class="kpi-nota">{{ panorama.vagas_presencial | numero }} presenciais ·
-        {{ panorama.vagas_ead | numero }} EaD</span>
+      <span class="kpi-nota">{{ panorama.vagas_presencial | numero }} presenciais
+        {%- if panorama.vagas_semipresencial %} ·
+        {{ panorama.vagas_semipresencial | numero }} semipresenciais
+        {%- else %} · {{ panorama.vagas_ead | numero }} EaD{% endif %}</span>
     </div>
     <div class="kpi">
       <span class="kpi-valor">{{ panorama.matriculas | numero }}</span>
@@ -79,6 +118,20 @@
       <span class="kpi-rotulo">Cursos avaliados no CPC 2023</span>
       <span class="kpi-nota">em {{ panorama.ufs_avaliadas }} das 27 UFs</span>
     </div>
+    {% if panorama.n_cursos_em_extincao %}
+    <div class="kpi">
+      <span class="kpi-valor">{{ panorama.vagas_semipresencial | numero }}</span>
+      <span class="kpi-rotulo">Vagas semipresenciais</span>
+      <span class="kpi-nota">{{ panorama.n_cursos_semipresencial | numero }}
+        cursos · formato criado em 2025</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-valor">{{ panorama.vagas_em_extincao | numero }}</span>
+      <span class="kpi-rotulo">Vagas encerradas ou em extinção</span>
+      <span class="kpi-nota">fora da capacidade ativa ·
+        {{ panorama.matriculas_em_extincao | numero }} matriculados</span>
+    </div>
+    {% endif %}
     <div class="kpi">
       <span class="kpi-valor">
         {%- if panorama.municipios_com_fisioterapeuta -%}

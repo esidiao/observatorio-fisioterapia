@@ -110,6 +110,93 @@ INDICADORES = [
        "de polos.",
        "vagas/ano", "contextual", "Censo INEP", dec=0, aliases=["vagas ead"]),
 
+    # ------------------------------------------- Censo 2025: formato e situação
+    #
+    # O Decreto 12.456/2025 proibiu a graduação em Fisioterapia inteiramente a
+    # distância e criou o formato semipresencial. O Censo 2025 registra as duas
+    # mudanças em colunas novas, e estes verbetes existem para que o leitor
+    # entenda por que a série muda de forma justamente aqui.
+
+    _i("pct_nao_presencial", "% nao presencial",
+       "Participacao da oferta que nao exige presenca integral", "Capacidade",
+       "Fatia da capacidade ativa em cursos que nao sao inteiramente "
+       "presenciais. Ate o Censo 2024 isso e a propria EaD; de 2025 em diante "
+       "e o semipresencial, formato para onde a oferta a distancia migrou "
+       "depois do Decreto 12.456/2025. O indicador atravessa a mudanca de lei "
+       "porque faz a mesma pergunta nas duas edicoes: que parte da oferta "
+       "dispensa presenca integral.",
+       "%", "contextual", "Censo INEP", dec=1, min=0, max=100,
+       aliases=["pct nao presencial"]),
+
+    _i("vagas_semipresencial", "Vagas semipres.", "Vagas em cursos semipresenciais",
+       "Capacidade",
+       "Vagas anuais em cursos de formato semipresencial, categoria criada "
+       "pelo Marco Regulatório de 2025. O semipresencial combina ensino a "
+       "distância com atividade presencial obrigatória, e por isso ocupa um "
+       "município de verdade — diferente do curso inteiramente a distância, "
+       "que é registrado na sede da mantenedora.",
+       "vagas/ano", "contextual", "Censo INEP", dec=0,
+       aliases=["vagas semipresencial", "semipresencial"]),
+
+    _i("n_cursos_semipresencial", "Cursos semipres.", "Cursos semipresenciais",
+       "Capacidade",
+       "Número de cursos no formato semipresencial em atividade.",
+       "cursos", "contextual", "Censo INEP", dec=0),
+
+    _i("matriculas_semipresencial", "Mat. semipres.",
+       "Matrículas em cursos semipresenciais", "Fluxo",
+       "Estudantes matriculados em cursos de formato semipresencial.",
+       "matrículas", "contextual", "Censo INEP", dec=0),
+
+    _i("polos_em_extincao", "Polos em extinção",
+       "Polos de apoio de cursos em extinção", "Território",
+       "Locais de apoio presencial que atendem cursos declarados em extinção. "
+       "São a rede que a regulação está desmontando: em 2025 ela ainda é a "
+       "maior do país neste curso, e continua recebendo estudante enquanto "
+       "as turmas existentes não se formam. Contados por local distinto, não "
+       "por linha: a fonte tem uma linha por local e curso, e um polo que "
+       "atende três cursos apareceria três vezes.",
+       "polos", "contextual", "Censo INEP", dec=0),
+
+    _i("polos_em_extincao_municipios", "Munic. com polo em extinção",
+       "Municípios alcançados por polo de curso em extinção", "Território",
+       "Municípios que têm ao menos um polo de apoio de curso em extinção. "
+       "Publicado ao lado do alcance ativo porque a diferença entre os dois "
+       "é o tamanho do recuo territorial que a mudança de regulação provoca.",
+       "municípios", "contextual", "Censo INEP", dec=0),
+
+    _i("vagas_em_extincao", "Vagas em extinção",
+       "Vagas em cursos em extinção", "Capacidade",
+       "Vagas de cursos que a instituição declarou em extinção. Não entram na "
+       "capacidade ativa: são oferta que a regulação já encerrou. Ficam "
+       "publicadas à parte porque, no ano da virada, esses cursos ainda "
+       "receberam ingressantes — a extinção é um processo, não um fato "
+       "consumado.",
+       "vagas/ano", "contextual", "Censo INEP", dec=0,
+       aliases=["vagas em extincao"]),
+
+    _i("n_cursos_em_extincao", "Cursos em extinção", "Cursos em extinção",
+       "Capacidade",
+       "Número de cursos declarados em extinção. Na Fisioterapia de 2025 são, "
+       "um a um, os cursos inteiramente a distância, que o Decreto 12.456/2025 "
+       "proibiu.",
+       "cursos", "contextual", "Censo INEP", dec=0),
+
+    _i("matriculas_em_extincao", "Mat. em extinção",
+       "Matrículas em cursos em extinção", "Fluxo",
+       "Estudantes matriculados em cursos em extinção. São pessoas que estão "
+       "matriculadas agora e têm direito a concluir no formato em que "
+       "ingressaram, por isso entram no total de matrículas — ao contrário "
+       "das vagas, que não entram na capacidade ativa.",
+       "matrículas", "contextual", "Censo INEP", dec=0),
+
+    _i("ingressos_em_extincao", "Ingress. em extinção",
+       "Ingressantes em cursos em extinção", "Fluxo",
+       "Estudantes que ingressaram no ano em cursos já declarados em extinção. "
+       "É a medida de quanto a oferta encerrada ainda recebeu gente durante a "
+       "transição prevista no decreto.",
+       "ingressantes", "contextual", "Censo INEP", dec=0),
+
     _i("vagas_capital", "Vagas na capital", "Vagas presenciais na capital",
        "Capacidade",
        "Vagas presenciais oferecidas na capital do estado. É metade do cálculo "

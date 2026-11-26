@@ -121,12 +121,87 @@ def test_serie_anual_separa_novidade_de_indeterminado():
     pipeline.sondar = lambda url, **kw: respostas[int(url.split("=")[-1])]
     try:
         novidades, indeterminados = pipeline._serie_anual(
-            "Teste", "https://exemplo/x?ano={ano}", 2024, 2026)
+            "Teste", ("https://exemplo/x?ano={ano}",), 2024, 2026)
     finally:
         pipeline.sondar = original
     assert novidades == ["Teste 2025"], novidades
     assert len(indeterminados) == 1, indeterminados
     assert "2026" in indeterminados[0]
+
+
+def test_serie_anual_tenta_todos_os_nomes_antes_de_negar():
+    """
+    404 em UM nome não prova que a edição não existe.
+
+    Este é o defeito que o teste não cobria e que aconteceu de verdade: o INEP
+    renomeou o arquivo do Censo em 2025 (tirou o "da" de
+    `microdados_censo_da_educacao_superior`), o verificador sondava só o nome
+    antigo, recebia 404 e imprimia "confirmadamente não publicado" sobre uma
+    edição que estava no ar havia horas.
+
+    Alerta que erra para o lado de "não há novidade" é pior que alerta nenhum:
+    o silêncio é indistinguível do silêncio legítimo, e ninguém vai conferir.
+    """
+    tentadas = []
+
+    def falso_sondar(url, **kw):
+        tentadas.append(url)
+        return (True, "206") if "novo" in url else (False, "404")
+
+    original = pipeline.sondar
+    pipeline.sondar = falso_sondar
+    try:
+        novidades, indeterminados = pipeline._serie_anual(
+            "Teste",
+            ("https://exemplo/antigo_{ano}.zip", "https://exemplo/novo_{ano}.zip"),
+            2024, 2025)
+    finally:
+        pipeline.sondar = original
+
+    assert novidades == ["Teste 2025"], (
+        f"o segundo nome respondeu e mesmo assim não houve novidade: "
+        f"{novidades}; tentadas: {tentadas}")
+    assert len(tentadas) == 2, (
+        f"devia ter tentado os dois nomes, tentou {tentadas}")
+    assert not indeterminados
+
+
+def test_serie_anual_so_nega_quando_todos_os_nomes_negam():
+    """Ausência só se afirma depois de esgotar os nomes conhecidos."""
+    original = pipeline.sondar
+    pipeline.sondar = lambda url, **kw: (False, "404")
+    try:
+        novidades, indeterminados = pipeline._serie_anual(
+            "Teste", ("https://exemplo/a_{ano}.zip", "https://exemplo/b_{ano}.zip"),
+            2024, 2025)
+    finally:
+        pipeline.sondar = original
+    assert novidades == []
+    assert indeterminados == [], (
+        "404 em todos os nomes é ausência confirmada, não indeterminado")
+
+
+def test_serie_anual_um_nome_indeterminado_nao_vira_ausencia():
+    """
+    Se um nome falhou por rede e os outros deram 404, o resultado é
+    INDETERMINADO — não ausência.
+
+    Misturar os dois é como o defeito original começa: basta uma falha de rede
+    no nome certo para o verificador anunciar que a edição não existe.
+    """
+    def falso_sondar(url, **kw):
+        return (None, "Timeout") if "b_" in url else (False, "404")
+
+    original = pipeline.sondar
+    pipeline.sondar = falso_sondar
+    try:
+        novidades, indeterminados = pipeline._serie_anual(
+            "Teste", ("https://exemplo/a_{ano}.zip", "https://exemplo/b_{ano}.zip"),
+            2024, 2025)
+    finally:
+        pipeline.sondar = original
+    assert novidades == []
+    assert len(indeterminados) == 1, indeterminados
 
 
 def test_serie_anual_sem_ano_atual_nao_afirma_nada():
@@ -138,7 +213,7 @@ def test_serie_anual_sem_ano_atual_nao_afirma_nada():
     numa roupagem diferente.
     """
     novidades, indeterminados = pipeline._serie_anual(
-        "Teste", "https://exemplo/x?ano={ano}", None, 2026)
+        "Teste", ("https://exemplo/x?ano={ano}",), None, 2026)
     assert novidades == []
     assert indeterminados, (
         "ano corrente desconhecido tem de virar indeterminado, não silêncio")

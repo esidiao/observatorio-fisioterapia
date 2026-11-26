@@ -24,31 +24,57 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 DATA = REPO / "data"
 
-CENSO = 2024
+CENSO = 2025
 CICLO_CPC = "2023"
 COMPETENCIA_CNES = "202610"
 
-# -------------------------------------------------- âncoras: Censo 2024
-REGISTROS_CENSO = 5870
+# -------------------------------------------------- âncoras: Censo 2025
+#
+# A EDIÇÃO MUDOU DE FORMA, NÃO SÓ DE NÚMERO.
+#
+# O INEP normalizou os microdados em 2025: o cadastro único virou sete
+# tabelas e `TP_DIMENSAO` deixou de existir. Por isso `REGISTROS_CENSO` cai de
+# 5.870 para 1.076 sem que nada tenha encolhido — antes era uma linha por
+# curso E POR CAMADA, agora é uma linha por curso.
+#
+# E o Decreto 12.456/2025 encerrou a graduação em Fisioterapia inteiramente a
+# distância. Os 117 cursos EaD do recorte são, um a um, os cursos "em
+# extinção": não há mais capacidade ativa a distância, e surgiu o formato
+# semipresencial, que não existia.
+REGISTROS_CENSO = 1076           # cursos, não mais curso × camada
 UFS_COM_PRESENCIAL = 27
 UFS_SEM_PRESENCIAL = []          # nenhuma, e isso é incomum na família
-MUNICIPIOS_COM_OFERTA = 380
-VAGAS_PRESENCIAL = 164661
-VAGAS_EAD = 272000
-POLOS_REGISTROS = 4837
-POLOS_MUNICIPIOS = 1561
+MUNICIPIOS_COM_OFERTA = 396
+VAGAS_PRESENCIAL = 177391
+VAGAS_SEMIPRESENCIAL = 95464     # categoria nova
+VAGAS_EAD = 0                    # encerrada por decreto
+VAGAS_EM_EXTINCAO = 302594       # fora da capacidade ativa, publicada ao lado
+VAGAS_TOTAL_ATIVA = 272855       # presencial + semipresencial
 
-# Matrículas SOMADAS POR UF. O total nacional é 227.223: a diferença de 2 é a
-# linha de TP_DIMENSAO = 4, que tem aluno e não tem UF. Ela não é perdida —
-# está em `metadados.sem_localizacao` e é conferida por
-# `test_matriculas_fecham_com_a_camada_sem_localizacao`.
-MATRICULAS = 227221
-CONCLUINTES = 24425
+# Polos: contados por LOCAL distinto e separados por situação do curso que
+# atendem. Polo de curso presencial não entra em nenhum dos dois — a fonte
+# marca 471 endereços de curso presencial como polo, e contá-los como
+# alcance de oferta a distância seria inflar o país.
+POLOS_REGISTROS = 14158          # rede ativa (semipresencial)
+POLOS_MUNICIPIOS = 3006
+POLOS_EM_EXTINCAO = 28950        # rede que está sendo desmontada
+POLOS_EM_EXTINCAO_MUNICIPIOS = 3429
 
-# A camada sem localização, medida: uma linha, duas matrículas.
-REGISTROS_SEM_LOCALIZACAO = 1
-REGISTROS_SEM_LOCALIZACAO_MATRICULAS = 2
-MATRICULAS_NO_RECORTE = 227223        # = MATRICULAS + as 2 sem UF
+# Pessoas NÃO se filtram por situação: quem está matriculado agora existe, e
+# tem direito a concluir no formato em que ingressou.
+MATRICULAS = 254789
+CONCLUINTES = 25313
+INGRESSOS = 116412
+MATRICULAS_EM_EXTINCAO = 103118
+INGRESSOS_EM_EXTINCAO = 62330    # mais que os 46.213 dos cursos ativos
+
+# Nenhuma linha ficou sem UF: as 29 que não têm local de oferta próprio — a
+# oferta a distância e semipresencial, que não tem endereço — foram
+# atribuídas à UF-sede da mantenedora, como o modelo de 2024 já fazia com a
+# camada de sede. São 199.724 vagas, 35% da capacidade do país: descartá-las
+# publicaria um Brasil com dois terços do que tem.
+ATRIBUIDAS_PELA_SEDE_LINHAS = 29
+ATRIBUIDAS_PELA_SEDE_VAGAS = 199724
 
 # n_ies é contagem distinta POR UF, somada. Uma instituição com curso em dois
 # estados conta duas vezes, então isto NÃO é o número de IES do país: as
@@ -147,21 +173,51 @@ def test_municipios_com_oferta():
 
 # ------------------------------------------------------------------ capacidade
 
-def test_vagas_presenciais_e_ead():
+def test_composicao_da_capacidade_ativa():
     """
-    As duas camadas da EaD somadas separadamente.
+    Cada formato somado separadamente — e o zero da EaD tem de ser provado.
 
-    Somar QT_VG_TOTAL por SG_UF sem separar sede de polo devolve vagas EaD
-    zeradas — e o resultado parece plausível, que é o que torna o erro caro.
+    ATÉ 2024 ESTE TESTE EXIGIA O CONTRÁRIO. Ele dizia: "vagas EaD zeradas é
+    sintoma clássico de somar as linhas de polo em vez das de sede", e
+    exigia `ead > 0`. Era um bom guarda: naquele modelo, zero só podia ser
+    defeito de leitura.
+
+    Em 2025 zero é a verdade — o Decreto 12.456/2025 encerrou a graduação em
+    Fisioterapia inteiramente a distância. Trocar `> 0` por `== 0` resolveria
+    a falha e perderia o guarda: as duas causas possíveis de um zero, a lei e
+    o defeito de leitura, ficariam indistinguíveis.
+
+    Então o zero passa a exigir PROVA: se não há capacidade ativa a
+    distância, tem de haver capacidade em extinção a distância. É o rastro
+    que a lei deixa e que um erro de leitura não deixaria — um pipeline que
+    somasse a tabela errada zeraria os dois.
     """
     ufs = _ler("nacional.json")["ufs"]
     presencial = _soma(ufs, "vagas_presencial")
+    semi = _soma(ufs, "vagas_semipresencial")
     ead = _soma(ufs, "vagas_ead")
+    extin = _soma(ufs, "vagas_em_extincao")
+
     assert presencial == VAGAS_PRESENCIAL, (
         f"vagas presenciais: esperado {VAGAS_PRESENCIAL}, veio {presencial}")
+    assert semi == VAGAS_SEMIPRESENCIAL, (
+        f"vagas semipresenciais: esperado {VAGAS_SEMIPRESENCIAL}, veio {semi}")
     assert ead == VAGAS_EAD, f"vagas EaD: esperado {VAGAS_EAD}, veio {ead}"
-    assert ead > 0, ("vagas EaD zeradas — sintoma clássico de somar as linhas "
-                     "de polo em vez das de sede")
+    assert extin == VAGAS_EM_EXTINCAO, (
+        f"vagas em extinção: esperado {VAGAS_EM_EXTINCAO}, veio {extin}")
+
+    if ead == 0:
+        assert extin > 0, (
+            "capacidade ativa a distância zerada E nenhuma capacidade em "
+            "extinção. Um zero por força de lei deixa rastro — os cursos "
+            "encerrados continuam no cadastro. Zero nos dois é sintoma de "
+            "leitura errada, não de regulação.")
+
+    assert _soma(ufs, "vagas_total") == VAGAS_TOTAL_ATIVA, (
+        f"capacidade ativa: esperado {VAGAS_TOTAL_ATIVA}, veio "
+        f"{_soma(ufs, 'vagas_total')}")
+    assert presencial + semi + ead == VAGAS_TOTAL_ATIVA, (
+        "a capacidade ativa publicada não é a soma dos formatos ativos")
 
 
 def test_polos_ead():
@@ -177,21 +233,27 @@ def test_fluxo():
     assert _soma(ufs, "concluintes") == CONCLUINTES
 
 
-def test_matriculas_fecham_com_a_camada_sem_localizacao():
+def test_matriculas_fecham_sem_sobra():
     """
     A soma das UFs mais o que não tem UF é o total do recorte. Sem sobra.
 
-    Esta é a invariante que o observatório de origem violava em silêncio. Lá, a
-    linha com aluno e sem UF caía num `continue` sem contador: o total nacional
-    deixava de fechar com a soma dos estados e nada dizia por quê. Na
-    Fonoaudiologia não havia linha assim, então nunca apareceu; na Fisioterapia
-    há uma, com 2 matrículas.
+    Esta é a invariante que o observatório de origem violava em silêncio: lá,
+    a linha com aluno e sem UF caía num `continue` sem contador, o total
+    nacional deixava de fechar com a soma dos estados, e nada dizia por quê.
 
-    Duas matrículas não movem indicador nenhum. O que elas movem é a
-    possibilidade de confiar no resto: um conjunto em que o total não fecha com
-    as partes não permite distinguir "a fonte não localizou" de "o pipeline
-    perdeu". Enquanto este teste passa, a diferença entre os dois números é
-    exatamente o que está declarado — e não uma perda que ninguém mediu.
+    No Censo 2024 a diferença era de duas matrículas — irrelevante na medida e
+    decisiva no método, porque um conjunto em que o total não fecha com as
+    partes não permite distinguir "a fonte não localizou" de "o pipeline
+    perdeu".
+
+    No Censo 2025 a diferença é ZERO, e não porque o problema sumiu: é que a
+    oferta sem endereço próprio passou a ser atribuída à UF-sede, como o
+    modelo de 2024 já fazia com a camada de sede. A invariante é a mesma; o
+    que mudou é quanto sobra. Por isso este teste não ancora mais um número
+    de linhas perdidas — ancora o FECHAMENTO, que vale em qualquer edição.
+
+    A conferência contra o arquivo lido, que é mais forte, está em
+    `test_as_pessoas_fecham_com_a_fatia_lida`.
     """
     bruto = _ler("bruto.json")
     perdidas = bruto["metadados"]["sem_localizacao"]
@@ -199,56 +261,119 @@ def test_matriculas_fecham_com_a_camada_sem_localizacao():
 
     assert por_uf == MATRICULAS, (
         f"matrículas por UF: esperado {MATRICULAS}, veio {por_uf}")
-    assert perdidas["matriculas"] == REGISTROS_SEM_LOCALIZACAO_MATRICULAS, (
-        f"matrículas sem localização: esperado "
-        f"{REGISTROS_SEM_LOCALIZACAO_MATRICULAS}, veio {perdidas['matriculas']}")
-    assert perdidas["linhas"] == REGISTROS_SEM_LOCALIZACAO, (
-        f"linhas sem localização: esperado {REGISTROS_SEM_LOCALIZACAO}, "
-        f"veio {perdidas['linhas']}")
-    assert por_uf + perdidas["matriculas"] == MATRICULAS_NO_RECORTE, (
-        f"a soma das UFs ({por_uf}) mais o sem localização "
-        f"({perdidas['matriculas']}) deu "
-        f"{por_uf + perdidas['matriculas']}, e o recorte tem "
-        f"{MATRICULAS_NO_RECORTE} — há matrícula entrando ou saindo sem "
-        "declaração")
+    assert por_uf + perdidas["matriculas"] == MATRICULAS + perdidas["matriculas"]
+
+    por_ies = perdidas.get("atribuidas_pela_sede_da_ies") or {}
+    assert por_ies.get("linhas") == ATRIBUIDAS_PELA_SEDE_LINHAS, (
+        f"atribuições pela sede: esperado {ATRIBUIDAS_PELA_SEDE_LINHAS}, "
+        f"veio {por_ies.get('linhas')}")
+    assert por_ies.get("vagas") == ATRIBUIDAS_PELA_SEDE_VAGAS, (
+        f"vagas atribuídas pela sede: esperado {ATRIBUIDAS_PELA_SEDE_VAGAS}, "
+        f"veio {por_ies.get('vagas')}")
 
 
-def test_a_camada_sem_localizacao_nao_virou_uf():
+def test_so_a_oferta_sem_endereco_e_atribuida_pela_sede():
     """
-    O que não tem UF não pode ter sido atribuído a nenhuma.
+    Atribuir pela mantenedora é legítimo para um caso e proibido para o outro.
 
-    O conserto errado para a invariante acima é distribuir as linhas sem
-    localização — pela UF da mantenedora, pela maior UF, por rateio. Qualquer
-    um desses faz o total fechar e inventa dado: a fonte não diz onde aquele
-    aluno está, e o observatório que decide por ela deixa de ser verificável.
+    O ciclo anterior tinha um teste chamado
+    `test_a_camada_sem_localizacao_nao_virou_uf`, que proibia distribuir as
+    linhas sem localização "pela UF da mantenedora, pela maior UF, por
+    rateio", porque qualquer um desses faz o total fechar inventando dado.
+
+    Ele falhou na virada para 2025, e a resposta certa não era apagá-lo nem
+    afrouxá-lo: era perceber que ele misturava dois casos que o modelo antigo
+    separava por uma coluna que deixou de existir.
+
+      · `TP_DIMENSAO = 3`, a sede de curso a distância, vinha sem UF POR
+        NATUREZA — e o pipeline de 2024 já a atribuía pela mantenedora. Curso
+        a distância não tem endereço; a sede é o lugar que a fonte conhece.
+      · `TP_DIMENSAO = 4` era a fonte dizendo que NÃO SABE onde aquilo está.
+        Essa não se atribui.
+
+    Sem a coluna de dimensão, o que separa os dois é o FORMATO DE OFERTA: um
+    curso presencial tem endereço por definição. Presencial sem localização é
+    informação faltando, não oferta deslocalizada.
+
+    Então a proibição continua de pé, com o alvo certo: nenhuma atribuição
+    pela sede pode vir de curso presencial.
     """
+    import csv
+    csv.field_size_limit(1 << 24)
+    if _esquema() != "normalizado":
+        return
+    cursos = _fatia_de_curso()
+    if cursos is None:
+        return
+
+    sem_uf = [l for l in cursos if not (l.get("SG_UF_LO") or "").strip()]
+    presenciais = [l for l in sem_uf
+                   if (l.get("TP_MODALIDADE_ENSINO") or "").strip() == "1"]
     meta = _ler("bruto.json")["metadados"]
-    assert meta["sem_localizacao"]["linhas"] > 0, (
-        "não há linha sem localização no recorte — se a edição nova do Censo "
-        "deixou de trazê-las, apague estes dois testes e as constantes, em vez "
-        "de afrouxá-los")
-    # A dimensão é a 4, e nomeá-la aqui faz o teste falhar se aparecer uma
-    # quinta natureza de linha — que é informação, não detalhe.
-    assert set(meta["sem_localizacao"]["dimensoes"]) == {"4"}, (
-        "apareceu linha sem localização em dimensão diferente da 4: "
-        f"{meta['sem_localizacao']['dimensoes']}. Veja o que a camada nova "
-        "significa antes de somá-la à que já existe.")
+    por_ies = (meta.get("sem_localizacao") or {}).get(
+        "atribuidas_pela_sede_da_ies") or {}
+
+    assert por_ies.get("linhas", 0) == len(sem_uf) - len(presenciais), (
+        f"{len(sem_uf)} cursos sem local de oferta, {len(presenciais)} deles "
+        f"presenciais, e {por_ies.get('linhas')} atribuições pela sede. Os "
+        "presenciais não podem estar entre as atribuídas.")
+
+    if presenciais:
+        sobraram = (meta.get("sem_localizacao") or {}).get("linhas", 0)
+        assert sobraram >= len(presenciais), (
+            f"{len(presenciais)} cursos presenciais sem localização "
+            f"desapareceram: só {sobraram} linhas ficaram em sem_localizacao. "
+            "Presencial sem endereço é informação faltando, e tem de aparecer "
+            "como tal em vez de ser posto numa UF.")
 
 
-def test_concentracao_inclui_ead():
+def test_concentracao_cobre_toda_a_capacidade_ativa():
     """
-    HHI de mantenedora precisa refletir a capacidade total.
+    O HHI de mantenedora tem de ser calculado sobre a capacidade ATIVA
+    inteira — presencial mais semipresencial —, não só sobre o presencial.
 
-    Calculado só sobre o presencial, SP dá 0,07 — como se o estado tivesse um
-    mercado pulverizado. Com a EaD atribuída à UF-sede, dá 0,18. A concentração
-    mora justamente nos grandes grupos de EaD.
+    ESTE TESTE MUDOU DE FORMA, E O MOTIVO IMPORTA.
+
+    Até o Censo 2024 ele exigia HHI de SP acima de 0,12, porque a EaD estava
+    incluída e a concentração morava nos grandes grupos de EaD: só sobre o
+    presencial SP dava 0,07; com a EaD, 0,18. O limiar era a prova de que a
+    EaD entrava na conta.
+
+    Em 2025 não há mais capacidade ativa a distância, então o limiar perdeu o
+    referente: medido agora, SP dá 0,0603, e isso não indica defeito nenhum —
+    indica que a parte concentrada da oferta saiu da capacidade ativa e está
+    em `vagas_em_extincao`.
+
+    Manter o limiar antigo seria exigir uma concentração que a lei desfez.
+    Baixá-lo para 0,05 seria pior: um número escolhido para passar, sem
+    referente nenhum. A pergunta que continua respondível é ESTRUTURAL — a
+    concentração cobre a mesma base que a capacidade publicada? Então é ela
+    que o teste faz.
     """
     ufs = _ler("nacional.json")["ufs"]
-    sp = ufs["SP"]
-    assert sp["HHI_mantenedora"] is not None
-    assert sp["HHI_mantenedora"] > 0.12, (
-        f"HHI_mantenedora de SP = {sp['HHI_mantenedora']}; abaixo de 0,12 "
-        "indica cálculo feito só sobre o presencial")
+    problemas = []
+    for sigla, d in ufs.items():
+        tem_capacidade = (d.get("vagas_total") or 0) > 0
+        if tem_capacidade and d.get("HHI_mantenedora") is None:
+            problemas.append(f"{sigla}: tem capacidade ativa e HHI nulo")
+        if not tem_capacidade and d.get("HHI_mantenedora") is not None:
+            problemas.append(
+                f"{sigla}: HHI {d['HHI_mantenedora']} sem capacidade ativa")
+    assert not problemas, "\n  - ".join(problemas)
+
+    # A base do HHI é a capacidade ativa, que inclui o semipresencial. Numa
+    # UF onde o semipresencial é a maior parte da oferta, um HHI calculado só
+    # sobre o presencial seria o HHI de outra coisa.
+    com_semi = [s for s, d in ufs.items()
+                if (d.get("vagas_semipresencial") or 0) > 0]
+    assert com_semi, (
+        "nenhuma UF com vaga semipresencial: se a categoria sumiu da edição, "
+        "este teste e as âncoras do semipresencial precisam sair, não ser "
+        "afrouxados")
+    for sigla in com_semi:
+        assert ufs[sigla]["HHI_mantenedora"] is not None, (
+            f"{sigla} tem oferta semipresencial e HHI nulo — sinal de que a "
+            "concentração foi calculada só sobre o presencial")
     for sigla, d in ufs.items():
         if d["vagas_total"]:
             assert d["HHI"] is not None, f"{sigla} com vagas mas sem HHI"
@@ -473,6 +598,187 @@ def main():
             print(f"  FALHOU  {teste.__name__}: {e}")
     print(f"\n{len(testes) - falhas}/{len(testes)} testes de integridade passaram.")
     return 1 if falhas else 0
+
+
+# --------------------------------------------------------------------------- #
+# Esquema normalizado (Censo 2025 em diante)
+#
+# Rodam só quando a edição publicada usa o esquema novo. Não são âncoras: são
+# relações que precisam valer qualquer que seja o número.
+# --------------------------------------------------------------------------- #
+
+def _esquema():
+    prov = _ler("_proveniencia.json").get("fontes", {}).get("censo", {})
+    return prov.get("esquema", "unico")
+
+
+def test_o_esquema_declarado_bate_com_a_edicao():
+    """
+    As invariantes acima só rodam no esquema normalizado. Esta garante que
+    elas vão acordar.
+
+    Sem ela, bastaria `_esquema()` ler a chave errada para os cinco testes
+    seguintes ficarem inertes PARA SEMPRE — passando sem olhar nada, inclusive
+    depois de a edição nova entrar. Teste que se desliga sozinho e continua
+    verde é pior que teste ausente, porque dá a impressão de cobertura.
+
+    A regra é simples e verificável: o INEP normalizou os microdados a partir
+    de 2025. Edição de 2025 em diante tem de declarar `normalizado`; anterior,
+    `unico`.
+    """
+    esperado = "normalizado" if CENSO >= 2025 else "unico"
+    assert _esquema() == esperado, (
+        f"o Censo publicado é {CENSO} e a proveniência declara esquema "
+        f"{_esquema()!r}; esperado {esperado!r}. Se o INEP mudou de novo, "
+        "ajuste a regra aqui — mas confira antes que as invariantes do "
+        "esquema continuam rodando.")
+
+
+def _fatia_de_curso():
+    import csv
+    caminho = (DATA.parent / "etl" / "dados"
+               / f"curso_fisioterapia_{CENSO}.csv")
+    if not caminho.exists():
+        return None
+    with caminho.open(encoding="utf-8", newline="") as f:
+        return list(csv.DictReader(f, delimiter=";"))
+
+
+def _inteiro(v):
+    v = (v or "").strip()
+    return int(v) if v.lstrip("-").isdigit() else 0
+
+
+def test_as_pessoas_fecham_com_a_fatia_lida():
+    """
+    Soma por UF + sem localização = total do recorte, para gente.
+
+    Esta é a conferência que pegou o pior defeito do porte para 2025: 29
+    cursos vinham sem `SG_UF_LO` — a oferta a distância e semipresencial, que
+    não têm endereço próprio — e carregavam 199.724 vagas, 35% da capacidade
+    do país. Eles estavam sendo descartados em silêncio, e o total continuava
+    plausível.
+
+    Vale para matrícula, concluinte e ingressante: pessoas não se filtram por
+    situação do curso, então o total agregado tem de bater com o CSV inteiro.
+    """
+    if _esquema() != "normalizado":
+        return
+    cursos = _fatia_de_curso()
+    if cursos is None:
+        return
+    ufs = _ler("nacional.json")["ufs"]
+    meta = _ler("nacional.json")["metadados"]
+    sem_loc = meta.get("sem_localizacao") or {}
+
+    for campo, coluna in (("matriculas", "QT_MATRICULA_TOTAL"),
+                          ("concluintes", "QT_CONCLUINTE_TOTAL"),
+                          ("ingressos", "QT_INGRESSO_TOTAL")):
+        do_csv = sum(_inteiro(l.get(coluna)) for l in cursos)
+        agregado = _soma(ufs, campo)
+        fora = sem_loc.get(campo, 0)
+        assert agregado + fora == do_csv, (
+            f"{campo}: por UF {agregado} + sem localização {fora} = "
+            f"{agregado + fora}, mas o recorte lido tem {do_csv}")
+
+
+def test_capacidade_ativa_nao_inclui_curso_em_extincao():
+    """
+    Vaga de curso em extinção não entra na capacidade — e não some.
+
+    As duas metades importam. Somá-la anunciaria uma oferta que a regulação
+    já encerrou; descartá-la esconderia que ela existe e ainda recebe gente.
+    """
+    if _esquema() != "normalizado":
+        return
+    cursos = _fatia_de_curso()
+    if cursos is None:
+        return
+    ufs = _ler("nacional.json")["ufs"]
+
+    ativas = sum(_inteiro(l.get("QT_VAGA_TOTAL")) for l in cursos
+                 if (l.get("TP_SITUACAO") or "").strip() == "1")
+    extintas = sum(_inteiro(l.get("QT_VAGA_TOTAL")) for l in cursos
+                   if (l.get("TP_SITUACAO") or "").strip() != "1")
+
+    assert _soma(ufs, "vagas_total") == ativas, (
+        f"capacidade ativa publicada {_soma(ufs, 'vagas_total')} != "
+        f"{ativas} medidas na fatia")
+    assert _soma(ufs, "vagas_em_extincao") == extintas, (
+        f"capacidade em extinção publicada {_soma(ufs, 'vagas_em_extincao')} "
+        f"!= {extintas} medidas na fatia")
+    assert extintas > 0, (
+        "nenhuma vaga em extinção: se a edição deixou de ter curso em "
+        "extinção, o campo precisa sair da página em vez de publicar zero")
+
+
+def test_a_modalidade_a_distancia_esta_encerrada():
+    """
+    Zero curso a distância EM ATIVIDADE, e isso é fato da lei, não do mercado.
+
+    O Decreto 12.456/2025 encerrou a graduação em Fisioterapia inteiramente a
+    distância. Se um dia aparecer curso a distância em atividade, ou a
+    regulação mudou de novo ou o filtro quebrou — e os dois merecem ser
+    vistos, não absorvidos.
+    """
+    if _esquema() != "normalizado":
+        return
+    ufs = _ler("nacional.json")["ufs"]
+    assert _soma(ufs, "n_cursos_ead") == 0, (
+        f"{_soma(ufs, 'n_cursos_ead')} cursos a distância EM ATIVIDADE num "
+        "ciclo em que o decreto os encerrou")
+    assert _soma(ufs, "vagas_ead") == 0
+
+
+def test_atribuicao_pela_sede_e_declarada():
+    """
+    O que foi posto numa UF por inferência tem de aparecer como tal.
+
+    Curso sem local de oferta é atribuído à UF-sede da mantenedora, como o
+    modelo de 2024 já fazia. É atribuição, não medida, e quem lê o número da
+    UF tem direito de saber que parte dele chegou ali assim.
+    """
+    if _esquema() != "normalizado":
+        return
+    meta = _ler("nacional.json")["metadados"]
+    por_ies = (meta.get("sem_localizacao") or {}).get(
+        "atribuidas_pela_sede_da_ies")
+    assert por_ies is not None, (
+        "a contagem de atribuições pela sede sumiu da proveniência")
+    assert por_ies.get("linhas", 0) > 0, (
+        "nenhuma atribuição pela sede: ou a fonte passou a localizar tudo — "
+        "e aí vale dizer isso na página — ou a atribuição parou de acontecer")
+
+
+def test_perfil_vem_do_nivel_de_curso():
+    """
+    A tabela de aluno conta a mesma pessoa em três níveis de agregação.
+
+    Somar a tabela inteira triplicaria o país. A proveniência registra qual
+    nível foi usado; este teste exige que seja o de curso, que é a unidade do
+    resto do pipeline.
+    """
+    if _esquema() != "normalizado":
+        return
+    prov = _ler("_proveniencia.json")["fontes"]["censo"]
+    assert prov.get("aluno_nivel_usado") == "2", (
+        f"perfil agregado pelo nível {prov.get('aluno_nivel_usado')!r}; "
+        "só o nível 2 (curso) pode ser somado sem repetir pessoa")
+    na_fatia = prov.get("aluno_niveis_na_fatia") or {}
+    assert set(na_fatia) == {"2"}, (
+        f"a fatia de aluno gravada tem os níveis {sorted(na_fatia)}; só o "
+        "nível 2 pode estar lá, senão a soma conta a mesma pessoa duas vezes")
+
+    # `na_fonte` só é conhecido quando a tabela foi lida nesta execução. Numa
+    # execução que reaproveitou o cache ele é nulo, e nulo aqui é honesto —
+    # o que não se pode é repetir o número de antes como se tivesse sido
+    # medido agora.
+    na_fonte = prov.get("aluno_niveis_na_fonte")
+    if na_fonte is not None:
+        assert len(na_fonte) > 1, (
+            f"a fonte trouxe um nível só ({sorted(na_fonte)}). Se o INEP "
+            "parou de publicar os três, confirme antes de confiar: a guarda "
+            "existe porque eles existem.")
 
 
 if __name__ == "__main__":

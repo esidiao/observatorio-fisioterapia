@@ -38,7 +38,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from extrair_censo import URL_CENSO, normalizar  # noqa: E402
+from extrair_censo import (codificacao_do_membro,  # noqa: E402
+                           esquema_do_zip, normalizar, url_do_censo,
+                           urls_do_censo)
 from rede import ZipRemotoHTTP, sondar  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
@@ -49,11 +51,32 @@ DIM_PRESENCIAL, DIM_POLO, DIM_SEDE = "1", "2", "3"
 
 # Campos que significam a mesma coisa em todas as edições.
 CAMPOS = [
-    "vagas_presencial", "vagas_ead", "vagas_total",
+    "vagas_presencial", "vagas_ead", "vagas_semipresencial",
+    "vagas_em_extincao", "vagas_total",
     "n_cursos_presencial", "n_ies",
     "municipios_oferta", "ead_polos_registros", "ead_polos_municipios",
     "matriculas", "concluintes",
 ]
+
+# O QUE CONTINUA COMPARÁVEL DEPOIS DE 2025, E O QUE NÃO
+#
+# O Decreto 12.456/2025 extinguiu a graduação em Fisioterapia inteiramente a
+# distância e criou o formato semipresencial. O Censo 2025 registra isso numa
+# variável que MUDOU DE SENTIDO — o dicionário do INEP diz que até 2024 ela
+# representa a modalidade e a partir de 2025 o formato de oferta.
+#
+# Por isso `vagas_ead` sai NULO em 2025, não zero. Zero afirmaria que a oferta
+# a distância desabou; nulo diz que a categoria deixou de existir. São coisas
+# diferentes, e a diferença é o assunto.
+#
+# `vagas_total` continua: é a capacidade que o Censo registra, com a mesma
+# definição de antes — tudo o que está no cadastro, inclusive o que está em
+# extinção. Separar o que é ativo é trabalho da página, não da série, porque a
+# série existe para comparar e as edições anteriores não distinguiam situação.
+CAMPOS_SEM_SENTIDO_APOS_2024 = {
+    "vagas_ead": "o Decreto 12.456/2025 extinguiu a modalidade; a variável do "
+                 "Censo passou a significar formato de oferta",
+}
 
 csv.field_size_limit(1 << 24)
 
@@ -63,6 +86,151 @@ def inteiro(valor):
     return int(texto) if texto.lstrip("-").isdigit() else 0
 
 
+def _agregar_normalizado(z, ano, rotulo, alvo, alvo_ies):
+    """
+    Agrega uma edição do esquema normalizado para a série.
+
+    Os polos NÃO são lidos aqui. Eles moram na tabela de local de oferta, que
+    tem 1,6 GB, e a série leria essa tabela inteira para extrair duas
+    contagens. Em vez disso, usa-se a fatia que o `extrair_censo.py` já grava
+    quando o pipeline roda aquela edição; se ela não existir, os dois campos
+    saem NULOS — "não medido nesta passada" é verdade, zero não é.
+    """
+    enc = codificacao_do_membro(z, alvo)
+    uf_sede = {}
+    with z.membro_arquivo(alvo_ies,
+                          encoding=codificacao_do_membro(z, alvo_ies)) as f:
+        for linha in csv.DictReader(f, delimiter=";"):
+            codigo = (linha.get("CO_IES") or "").strip()
+            sigla = (linha.get("SG_UF_IES") or "").strip().upper()
+            if codigo and sigla:
+                uf_sede[codigo] = sigla
+
+    alvo_norm = normalizar(rotulo)
+    ufs = defaultdict(lambda: {
+        "vagas_presencial": 0, "vagas_semipresencial": 0,
+        "vagas_em_extincao": 0, "vagas_total": 0,
+        "n_cursos_presencial": 0, "matriculas": 0, "concluintes": 0,
+        "_ies": set(), "_mun_oferta": set(),
+    })
+    lidas = casadas = 0
+    print(f"[SERIE] {ano}: lendo {alvo.rsplit('/', 1)[-1]} (esquema normalizado)")
+    with z.membro_arquivo(alvo, encoding=enc) as f:
+        for linha in csv.DictReader(f, delimiter=";"):
+            lidas += 1
+            if normalizar(linha.get("NO_CINE_ROTULO")) != alvo_norm:
+                continue
+            casadas += 1
+            cod_ies = (linha.get("CO_IES") or "").strip()
+            sigla = (linha.get("SG_UF_LO") or "").strip().upper() or None
+            if not sigla:
+                sigla = uf_sede.get(cod_ies)
+            if not sigla:
+                continue
+            formato = (linha.get("TP_MODALIDADE_ENSINO") or "").strip()
+            situacao = (linha.get("TP_SITUACAO") or "").strip()
+            vagas = inteiro(linha.get("QT_VAGA_TOTAL"))
+            cod_mun = (linha.get("CO_MUNICIPIO_LO") or "").strip()
+
+            d = ufs[sigla]
+            d["_ies"].add(cod_ies)
+            d["matriculas"] += inteiro(linha.get("QT_MATRICULA_TOTAL"))
+            d["concluintes"] += inteiro(linha.get("QT_CONCLUINTE_TOTAL"))
+            # Capacidade ATIVA, a mesma definicao que a pagina publica.
+            #
+            # Uma versao anterior somava tudo aqui, "para manter a definicao
+            # das edicoes anteriores", e o resultado foi pior que o problema:
+            # `vagas_total` passava a valer 575.449 na serie e 272.855 na
+            # pagina. Mesmo nome, dois sentidos, dois artefatos — e nenhum
+            # leitor tem como saber qual esta vendo.
+            #
+            # Agora e so a ativa nos dois lugares. Para 2021-2024 isso nao
+            # muda nada, porque a fonte nao distinguia situacao; para 2025 a
+            # parte encerrada aparece na sua propria linha, ao lado.
+            if situacao == "1":
+                d["vagas_total"] += vagas
+            else:
+                d["vagas_em_extincao"] += vagas
+            if formato == "1":
+                d["n_cursos_presencial"] += 1
+                if situacao == "1":
+                    d["vagas_presencial"] += vagas
+                if cod_mun:
+                    d["_mun_oferta"].add(cod_mun)
+            elif formato == "3" and situacao == "1":
+                d["vagas_semipresencial"] += vagas
+
+    polos_reg, polos_mun = _polos_da_fatia(ano, rotulo)
+
+    saida = {}
+    for sigla, d in ufs.items():
+        saida[sigla] = {
+            "vagas_presencial": d["vagas_presencial"],
+            # nulo, não zero: ver CAMPOS_SEM_SENTIDO_APOS_2024
+            "vagas_ead": None,
+            "vagas_semipresencial": d["vagas_semipresencial"],
+            "vagas_em_extincao": d["vagas_em_extincao"],
+            "vagas_total": d["vagas_total"],
+            "n_cursos_presencial": d["n_cursos_presencial"],
+            "n_ies": len(d["_ies"]),
+            "municipios_oferta": len(d["_mun_oferta"]),
+            "ead_polos_registros": polos_reg.get(sigla),
+            "ead_polos_municipios": polos_mun.get(sigla),
+            "matriculas": d["matriculas"],
+            "concluintes": d["concluintes"],
+        }
+    print(f"[SERIE] {ano}: {lidas} linhas, {casadas} do rótulo exato, "
+          f"{len(saida)} UFs")
+    return saida
+
+
+def _polos_da_fatia(ano, rotulo):
+    """
+    Polos por UF, lidos da fatia local — ou vazios, se ela não existir.
+
+    Vazio aqui vira `None` no agregado, não zero: a série não mede o que não
+    leu, e "não medido" é diferente de "não há".
+    """
+    from extrair_censo import slug
+    caminho = DADOS / f"local_oferta_{slug(rotulo)}_{ano}.csv"
+    if not caminho.exists():
+        print(f"[SERIE] {ano}: sem a fatia de local de oferta; polos ficam nulos")
+        return {}, {}
+    # Mesma regra do pipeline, e pelos mesmos motivos: polo de curso
+    # PRESENCIAL nao e alcance de oferta a distancia (a fonte marca 471
+    # enderecos assim no recorte de 2025), e polo de curso em extincao e
+    # outra populacao — a rede que esta sendo desmontada. Contar as tres
+    # juntas daria 3.438 municipios onde o alcance ativo e 3.006.
+    curso = DADOS / f"curso_{slug(rotulo)}_{ano}.csv"
+    formato, situacao = {}, {}
+    if curso.exists():
+        with open(curso, encoding="utf-8", newline="") as f:
+            for linha in csv.DictReader(f, delimiter=";"):
+                cod = (linha.get("CO_CURSO") or "").strip()
+                formato[cod] = (linha.get("TP_MODALIDADE_ENSINO") or "").strip()
+                situacao[cod] = (linha.get("TP_SITUACAO") or "").strip()
+
+    registros, municipios = defaultdict(set), defaultdict(set)
+    with open(caminho, encoding="utf-8", newline="") as f:
+        for linha in csv.DictReader(f, delimiter=";"):
+            if (linha.get("IN_LOCAL_OFERTA_POLO") or "").strip() != "1":
+                continue
+            sigla = (linha.get("SG_UF_LO") or "").strip().upper()
+            if not sigla:
+                continue
+            cod_curso = (linha.get("CO_CURSO") or "").strip()
+            if formato.get(cod_curso) == "1":
+                continue
+            if situacao and situacao.get(cod_curso) != "1":
+                continue
+            registros[sigla].add((linha.get("CO_LOCAL_OFERTA") or "").strip())
+            mun = (linha.get("CO_MUNICIPIO_LO") or "").strip()
+            if mun:
+                municipios[sigla].add(mun)
+    return ({u: len(v) for u, v in registros.items()},
+            {u: len(v) for u, v in municipios.items()})
+
+
 def agregar_ano(ano, rotulo="Fisioterapia"):
     """Lê a edição `ano` remotamente e devolve o agregado por UF."""
     cache = DADOS / f"serie_{ano}.json"
@@ -70,7 +238,13 @@ def agregar_ano(ano, rotulo="Fisioterapia"):
         print(f"[SERIE] {ano}: usando agregado em cache")
         return json.loads(cache.read_text(encoding="utf-8"))
 
-    url = URL_CENSO.format(ano=ano)
+    url, situacao = url_do_censo(ano)
+    if url is None:
+        tentados = ", ".join(urls_do_censo(ano))
+        raise SystemExit(
+            f"[ERRO] edição {ano} do Censo não encontrada"
+            + (" (falha de rede, não ausência)" if situacao is None else "")
+            + f". Tentei: {tentados}")
     existe, detalhe = sondar(url)
     if existe is False:
         print(f"[SERIE] {ano}: confirmadamente não publicado — ano pulado.")
@@ -86,6 +260,12 @@ def agregar_ano(ano, rotulo="Fisioterapia"):
     if not alvo or not alvo_ies:
         print(f"[SERIE] {ano}: membros esperados não encontrados no ZIP — pulado.")
         return None
+
+    if esquema_do_zip(z) == "normalizado":
+        saida = _agregar_normalizado(z, ano, rotulo, alvo, alvo_ies)
+        cache.write_text(json.dumps(saida, ensure_ascii=False, indent=1),
+                         encoding="utf-8")
+        return saida
 
     print(f"[SERIE] {ano}: lendo {alvo.rsplit('/', 1)[-1]} ...")
 
@@ -188,9 +368,19 @@ def main():
 
     brasil = {}
     for ano in anos:
-        brasil[ano] = {campo: sum((por_ano[ano].get(s) or {}).get(campo) or 0
-                                  for s in siglas)
-                       for campo in CAMPOS}
+        # Soma que PRESERVA a ausencia.
+        #
+        # `sum(... or 0)` transforma None em zero, e zero afirma. Aqui isso
+        # apagaria duas coisas de uma vez: a EaD de 2025, que e nula porque a
+        # categoria acabou (e nao porque a oferta desabou), e o
+        # semipresencial dos anos anteriores a 2025, que e nulo porque a
+        # categoria nao existia. Um campo nulo em TODAS as UFs continua nulo
+        # no Brasil.
+        brasil[ano] = {}
+        for campo in CAMPOS:
+            valores = [(por_ano[ano].get(s) or {}).get(campo) for s in siglas]
+            presentes = [v for v in valores if v is not None]
+            brasil[ano][campo] = sum(presentes) if presentes else None
 
     saida = {
         "metadados": {
@@ -215,6 +405,9 @@ def main():
     print(f"[SERIE] {len(anos)} edições ({', '.join(anos)}) -> {args.saida}")
     for campo in ("vagas_total", "matriculas", "concluintes"):
         antes, depois = brasil[anos[0]][campo], brasil[anos[-1]][campo]
+        if antes is None or depois is None:
+            print(f"[SERIE]   {campo}: sem comparacao (ponta nula)")
+            continue
         variacao = (depois - antes) / antes * 100 if antes else None
         marca = f"{variacao:+.1f}%" if variacao is not None else "—"
         print(f"[SERIE]   {campo}: {antes} -> {depois} ({marca})")

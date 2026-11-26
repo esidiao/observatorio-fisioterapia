@@ -9,23 +9,51 @@ Compartilha o método e o design system; não compartilha código, dados nem dep
 
 ## O que este observatório mede
 
-| | Fisioterapia (Censo 2024 · CPC 2023 · CNES 202610) |
+| | Fisioterapia (Censo 2025 · CPC 2023 · CNES 202610) |
 |---|---|
-| Registros no Censo | 5.870 |
+| Cursos no Censo | 1.076 — 955 em atividade, 121 encerrados ou em extinção |
 | UFs com oferta **presencial** | **27** de 27 |
-| Municípios com oferta presencial | 380 |
-| Vagas presenciais | 164.661 |
-| Vagas EaD (atribuídas à UF-sede) | 272.000 |
-| **% da capacidade a distância** | **62,3%** |
-| Polos de EaD | 4.837 registros em 1.561 municípios |
-| Matrículas / concluintes | 227.223 / 24.425 |
-| IES distintas | 763 |
+| Municípios com oferta presencial | 396 |
+| Vagas presenciais | 177.391 |
+| Vagas semipresenciais | 95.464 *(categoria nova)* |
+| Vagas **a distância em atividade** | **0** — encerradas pelo Decreto 12.456/2025 |
+| Vagas em cursos encerrados ou em extinção | 302.594, publicadas **ao lado** da capacidade |
+| **% da capacidade ativa não presencial** | **35,0%** |
+| Polos da rede ativa | 14.158 registros em 3.006 municípios |
+| Polos da rede em extinção | 28.950 registros em 3.429 municípios |
+| Matrículas / concluintes / ingressos | 254.789 / 25.313 / 116.412 |
+| Matrículas em curso em extinção | 103.118 — e 62.330 pessoas **ingressaram** neste ano |
+| IES distintas | 838 |
 | Cursos avaliados no CPC 2023 | 711, em **todas** as 27 UFs |
+
+### O Censo 2025 mudou de forma, não só de número
+
+Duas rupturas caem na mesma edição, e confundi-las produz leituras falsas.
+
+**O INEP normalizou os microdados.** O cadastro único de curso virou sete tabelas
+(`curso`, `aluno`, `ies`, `docente`, `local_oferta`, `biblioteca`, `laboratorio`) e a
+coluna `TP_DIMENSAO` **deixou de existir**: as camadas presencial / polo / sede viraram
+bandeiras na tabela de local de oferta. Por isso a contagem de registros cai de 5.870
+(Censo 2024) para 1.076 **sem que nada tenha encolhido** — antes era uma linha por curso
+*e por camada*, agora é uma linha por curso. Quem comparar os dois números como série
+anunciará um colapso que não houve.
+
+**O Decreto 12.456/2025 encerrou a graduação em saúde inteiramente a distância.** Em
+Fisioterapia não sobrou **nenhum** curso EaD em atividade: os 117 que existem estão, um a
+um, marcados "em extinção" na nova coluna `TP_SITUACAO`. E surgiu o formato
+**semipresencial**, que não existia. Somar as vagas de formato 2 sem olhar a situação diz
+que a EaD cresceu no ano em que ela foi proibida — foi exatamente o erro que apareceu na
+série do observatório de Farmácia e que está consertado lá.
+
+A regra adotada: **vaga de curso em extinção não entra na capacidade** (é oferta que a
+regulação já encerrou) e **não desaparece** (sai em campo próprio). **Pessoas não se
+filtram por situação** — quem está matriculado agora existe e tem direito a concluir no
+formato em que ingressou.
 
 ### A escala muda o que as páginas precisam dizer
 
 Este é o maior curso de saúde da família de observatórios: 711 cursos avaliados
-contra 74 da Fonoaudiologia e 452 da Odontologia. Três consequências não são
+contra 74 da Fonoaudiologia e 452 da Odontologia. Quatro consequências não são
 escolha editorial, são imposição do dado.
 
 **Não existe seção de "UF sem oferta".** A Fonoaudiologia precisa dela — Amapá,
@@ -33,17 +61,23 @@ Mato Grosso do Sul e Roraima não têm curso nenhum, e omiti-los faria o país
 parecer coberto. Aqui as 27 UFs têm curso presencial e curso avaliado. O que
 separa os estados não é *ter*, é escala, concentração e qualidade.
 
-**A EaD é o fato central, não uma ressalva.** 62,3% da capacidade é a
-distância, atrás apenas de Administração na família. Na Odontologia a
-modalidade é zero medido e fica fora da matriz de correlação por não ter
-variância; aqui é o contrário, e errar a camada de `TP_DIMENSAO` não daria uma
-imprecisão de margem — daria um país com um terço das vagas que tem.
+**A ruptura da EaD é o fato central, não uma ressalva.** No Censo 2024, 62,3% da
+capacidade era a distância. Em 2025 a capacidade ativa a distância é zero e o
+semipresencial responde por 35,0% — e há 103.118 pessoas matriculadas na oferta
+encerrada. A manchete do sítio é essa, porque publicar só a capacidade ativa esconderia
+um terço de milhão de vagas em desmonte, e publicar os dois somados afirmaria uma oferta
+que a lei acabou.
 
 **Presença não é cobertura, e a distância entre as duas é o achado.** Há curso
-presencial em 380 municípios e polo de EaD em 1.561 — quatro vezes mais. A
-manchete do sítio carrega os dois números de propósito: publicar só o
-presencial subestimaria o alcance, e publicar só o total esconderia que quase
-todo esse alcance é a distância.
+presencial em 396 municípios e polo da rede ativa em 3.006 — quase oito vezes mais. Os dois
+números vão juntos de propósito: publicar só o presencial subestimaria o alcance, e
+publicar só o total esconderia que quase todo esse alcance não é presencial.
+
+**Polo não é uma população só, são três.** A soma ingênua por endereço dá 29.921 polos
+em 3.438 municípios, misturando a rede EaD em extinção (28.950), a rede semipresencial
+que nasceu no lugar dela (14.158) e **471 endereços de curso presencial** que a fonte
+também marca como polo. Contar os três juntos como alcance de oferta a distância infla o
+país; o alcance ativo real é 3.006 municípios.
 
 ## Estrutura
 
@@ -61,7 +95,7 @@ todo esse alcance é a distância.
 
 | Indicador | Fonte | Acesso |
 |---|---|---|
-| Oferta, vagas, matrículas, polos | Censo da Educação Superior 2024 (INEP) | HTTPS, ZIP lido por `Range` |
+| Oferta, vagas, matrículas, polos | Censo da Educação Superior 2025 (INEP) | HTTPS, ZIP lido por `Range` |
 | CPC, IDD, ENADE, perfil docente | CPC 2023 (INEP), área FISIOTERAPIA | HTTPS |
 | Força de trabalho no SUS | CNES — vínculos nas **nove** ocupações de fisioterapeuta | FTP DATASUS |
 | Rede especializada | CNES — serviço **126** inteiro + `135/003` e `135/011` | FTP DATASUS |
@@ -112,48 +146,56 @@ Casar por **texto** também não serve: capturaria `234425 PROFESSOR DE FISIOTER
 
 ### O rótulo CINE tem oito vizinhos, e o match é exato
 
-Medido no Censo 2024: o rótulo exato `Fisioterapia` tem 5.870 registros. Uma busca por
-substring `fisi` devolveria **30.353** — cinco vezes a medida certa:
+Medido no Censo 2025: o rótulo exato `Fisioterapia` tem 1.076 cursos. Uma busca por
+substring `fisi` devolveria **3.116** — quase três vezes a medida certa:
 
-| Registros | Rótulo |
+| Cursos | Rótulo |
 |---|---|
-| 10.117 | Educação física |
-| 9.966 | Educação física formação de professor |
-| **5.870** | **Fisioterapia** |
-| 3.575 | Física formação de professor |
-| 783 | Física |
+| **1.076** | **Fisioterapia** |
+| 917 | Educação física |
+| 691 | Educação física formação de professor |
+| 321 | Física formação de professor |
+| 70 | Física |
 | 13 | Engenharia física |
-| 13 | Física médica |
+| 12 | Física médica |
 | 8 | Geofísica |
 | 8 | Física aplicada |
 
-`Educação física` sozinha é maior que o curso inteiro, e nenhum desses rótulos é
-Fisioterapia. Buscar `fisio` em vez de `fisi` devolveria só `Fisioterapia` **hoje** — o
-que não autoriza substring: o vizinho que não existe nesta edição pode existir na
-próxima, e um extrator que passou a casar por pedaço porque "dava no mesmo" somaria o
-curso novo sem avisar ninguém. O diagnóstico refaz a verificação em qualquer edição:
+Nenhum desses rótulos é Fisioterapia. Buscar `fisio` em vez de `fisi` devolveria só
+`Fisioterapia` **hoje** — o que não autoriza substring: o vizinho que não existe nesta
+edição pode existir na próxima, e um extrator que passou a casar por pedaço porque "dava
+no mesmo" somaria o curso novo sem avisar ninguém. O diagnóstico refaz a verificação em
+qualquer edição:
 
 ```bash
-python etl/extrair_censo.py --ano 2024 --listar-rotulos fisi
+python etl/extrair_censo.py --ano 2025 --listar-rotulos fisi
 ```
 
-### A quarta camada de `TP_DIMENSAO`
+Os nove rótulos são os mesmos de 2024, e as contagens caem em bloco pelo mesmo motivo da
+linha anterior: uma linha por curso em vez de uma por curso × camada.
 
-Os observatórios irmãos conhecem três naturezas de linha: presencial, polo de EaD e sede
-de EaD. O Censo 2024 de Fisioterapia traz uma quarta — uma linha com `TP_DIMENSAO = 4`,
-modalidade EaD, **sem UF e sem município**, com 0 vagas e 2 matrículas.
+### A camada sem endereço, antes e depois de `TP_DIMENSAO`
 
-No código dos irmãos uma linha assim desaparece: a atribuição de UF cai num `continue`
-por falta de `SG_UF`, sem contador e sem aviso. O total nacional deixa de fechar com a
-soma dos estados e nada diz por quê.
+Até 2024 a oferta a distância ocupava três naturezas de linha — presencial, polo e sede
+—, e o Censo 2024 de Fisioterapia trazia uma quarta: `TP_DIMENSAO = 4`, modalidade EaD,
+**sem UF e sem município**. Essa quarta camada era a fonte dizendo *não sei onde é*, e a
+sede era a fonte dizendo *não tem onde ser* — a oferta a distância não tem endereço por
+natureza. Duas ausências diferentes, com tratamentos diferentes: a sede era atribuída à
+UF da mantenedora, a camada 4 era contada e deixada fora de toda UF.
 
-São duas matrículas — irrelevante na medida, e completamente relevante no método. Um
-conjunto em que o total não fecha com as partes não permite distinguir "a fonte não
-localizou" de "o pipeline perdeu". Aqui a camada é contada, entra no total nacional, não
-entra em nenhuma UF, aparece em `metadados.sem_localizacao` e é conferida por dois testes
-— um que fecha a conta (227.221 por UF + 2 = 227.223 no recorte) e outro que proíbe o
-conserto errado, que seria distribuir as linhas por UF da mantenedora ou por rateio:
-isso faria o total fechar **inventando dado**.
+Sem `TP_DIMENSAO`, as duas viraram a mesma ausência, e o que as separa passou a ser o
+**formato**: curso presencial tem endereço por definição; a distância e semipresencial,
+não. Medido em 2025, as 29 linhas sem local de oferta próprio são 19 a distância e 10
+semipresenciais — **nenhuma presencial**. São 199.724 vagas, 35% da capacidade do país:
+descartá-las publicaria um Brasil com dois terços do que tem.
+
+Por isso a atribuição pela UF-sede continua, agora com a guarda explícita do formato, e o
+contador saiu em `metadados.sem_localizacao.atribuidas_pela_sede_da_ies`. O teste que
+guardava isso **mudou de alvo, não de rigor**: ele proibia "distribuir por UF da
+mantenedora" porque em 2024 isso significaria inventar a localização da camada 4; agora
+exige que só a oferta sem endereço seja atribuída, e **derruba a validação** se alguma
+linha presencial entrar nessa conta. Um conjunto em que o total não fecha com as partes
+não permite distinguir "a fonte não localizou" de "o pipeline perdeu".
 
 ### Serviço declarado não é serviço público
 
@@ -181,8 +223,8 @@ Fonoaudiologia, onde o mesmo filtro medido leva os estabelecimentos de 5.568 a 9
 A contagem de profissionais segue a mesma lógica e tem um resultado próprio: **105.511
 fisioterapeutas com vínculo SUS**, presentes em **5.545 dos 5.571 municípios** (99,5%) —
 contra 161.574 profissionais no total declarado. O profissional chega praticamente a todo
-o país; o *serviço* estruturado, a 85% dele; e a *formação* presencial, a 380 municípios
-(6,8%). Os três alcances são medidos separadamente justamente porque não coincidem.
+o país; o *serviço* estruturado, a 85% dele; e a *formação* presencial, a 396 municípios
+(7,1%). Os três alcances são medidos separadamente justamente porque não coincidem.
 
 Na mesma tabela, a coluna `ST_ATIVO_SN` vem **vazia em todas as linhas** deste export. O
 filtro de serviço inativo que existia no extrator lia coluna sempre em branco e nunca
@@ -245,18 +287,38 @@ resultado conhecido; e a coerência interna do catálogo de indicadores.
 python tests/test_catalogo.py
 python tests/test_validacao.py
 python tests/test_check_fontes.py
+python tests/test_acessibilidade.py
+python tests/test_sem_vazamento.py
+python tests/test_conteudo_publicado.py
+python tests/test_links.py
 ```
 
-Rodam como script ou sob `pytest`, se você o tiver instalado.
+Rodam como script ou sob `pytest`, se você o tiver instalado. São 66 testes.
+
+Três deles guardam a mudança de edição em vez de um número:
+`test_o_esquema_declarado_bate_com_a_edicao` derruba a validação se o ano do Censo e o
+esquema lido discordarem; `test_composicao_da_capacidade_ativa` só aceita vaga EaD zerada
+**acompanhada** de capacidade em extinção, que é o rastro que a lei deixa e que um erro de
+leitura não deixaria; e `test_so_a_oferta_sem_endereco_e_atribuida_pela_sede` impede que
+oferta presencial entre na atribuição pela UF-sede.
 
 ## Atualizar os dados
 
 ```bash
-python etl/pipeline.py --check-only     # só verifica se as fontes mudaram
-python etl/pipeline.py --ano 2024       # extrai, calcula, valida, publica
-python etl/pipeline.py --so-riqueza     # só a guarda de riqueza
-python etl/serie.py --anos 2023 2024    # série histórica
+python etl/pipeline.py --check-only          # só verifica se as fontes mudaram
+python etl/pipeline.py --ano 2025            # extrai, calcula, valida, publica
+python etl/pipeline.py --so-riqueza          # só a guarda de riqueza
+python etl/serie.py --anos 2021 2025         # série histórica
 ```
+
+A extração de 2025 lê 2,4 GB em fluxo — a tabela de local de oferta tem 1,6 GB e a de
+aluno 796 MB. Ela é **retomável fatia por fatia**: cada recorte é gravado em `.parcial` e
+renomeado no fim, então *existir* significa *estar completo*, e uma segunda execução pula
+o que já está em `etl/dados/`. Use `--rebaixar` para forçar a releitura.
+
+O nome do arquivo no INEP mudou nesta edição — `microdados_censo_educacao_superior_2025.zip`,
+sem o `da` —, e o verificador de fontes sonda **os dois** padrões. Sondar só o antigo
+responderia "não há edição nova" no dia em que ela saiu.
 
 A extração do CNES leva perto de uma hora, porque o FTP do DATASUS derruba a
 maior parte das conexões que usam `REST`. Ela guarda as fatias já filtradas em
@@ -304,9 +366,12 @@ Nenhum indicador é estimado, interpolado ou preenchido por analogia. Sem fonte 
 para um recorte, o valor é `null` e aparece como **"sem dados"** — nunca zero, nunca média
 plausível. Todo número carrega proveniência: fonte, ano e data de extração.
 
-Isso pesa mais aqui do que no observatório de Farmácia: com 24 UFs e 74 cursos avaliados,
-as lacunas são proporcionalmente maiores e a tentação de preencher por analogia é
-constante.
+A edição de 2025 cobra esse princípio de um jeito novo: há três ausências que **não são
+zero**. `vagas_ead` em 2025 é zero *medido* — a categoria existe e está vazia. Já
+`vagas_semipresencial` e `vagas_em_extincao` antes de 2025 são `null`, porque a categoria
+não existia: escrever zero ali afirmaria "nenhum curso em extinção em 2021", quando a
+fonte simplesmente não distinguia situação. Na série, a linha da EaD **termina em 2024** e
+não desce até zero, e a soma nacional preserva o nulo em vez de somá-lo como zero.
 
 ## Autoria e direitos
 

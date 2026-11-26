@@ -8,8 +8,8 @@
     "obra": "Observatório Nacional da Formação em Fisioterapia",
     "descricao": "Sítio estático data-driven com indicadores de acesso territorial, qualidade e cobertura assistencial dos cursos de Fisioterapia no Brasil: formulação e cálculo dos índices ICT, E, IAF, ICAFT e ICRE, catálogo de indicadores, textos e desenho editorial."
   },
-  "registrado_em": "2026-11-23T19:57:31+00:00",
-  "git_commit_ancora": "d7e0b9fb859c685cde1619d657d743835b59ab49",
+  "registrado_em": "2026-11-26T19:26:10+00:00",
+  "git_commit_ancora": "9ae42477768f8e44d51fa61dfc2eaf1a814a4143",
   "algoritmo": "SHA-256 sobre o conteúdo com fim de linha normalizado em LF",
   "fundamento": "Lei 9.610/1998 (direitos autorais) e Lei 9.609/1998 (programa de computador). O resumo combinado é impressão digital única do conjunto; o commit Git ancora a data no histórico versionado.",
   "como_verificar": [
@@ -23,8 +23,8 @@
   "natureza": "Declaração datada de conteúdo, com anterioridade ancorada no histórico do repositório. Permite comparar uma cópia com o original arquivo a arquivo. Não é registro em cartório nem depósito no INPI, e não substitui nenhum dos dois.",
   "escopo": "Apenas material autoral: código, textos, templates e o desenho dos índices. Não inclui os dados públicos (INEP, DATASUS, IBGE), que pertencem às respectivas fontes, nem bibliotecas de terceiros.",
   "n_arquivos": 40,
-  "bytes_totais": 475280,
-  "sha256_combinado": "d1537f22afb3a7668dfe97773e3c2ee1f61bcd12a008dcfd4769d28c1e33de3d",
+  "bytes_totais": 544912,
+  "sha256_combinado": "b36d5d273a68de67532c7d56b6b33f8fdcc0ed661ff4ee25586c56213b22f6fc",
   "arquivos": [
     {
       "arquivo": "README.md",
@@ -58,9 +58,9 @@
     },
     {
       "arquivo": "etl/extrair_censo.py",
-      "bytes": 9808,
-      "linhas": 236,
-      "sha256": "e2e9707912e5414ac14527dacc40f56e40d5bd03a5d3e10b1027ba52f4b319be"
+      "bytes": 25076,
+      "linhas": 566,
+      "sha256": "f139a26aebb35436ccbfc616f4168121ec2016e9567894deffcb96f1e5ef62be"
     },
     {
       "arquivo": "etl/extrair_cnes.py",
@@ -82,15 +82,15 @@
     },
     {
       "arquivo": "etl/ingestao.py",
-      "bytes": 20712,
-      "linhas": 485,
-      "sha256": "918faa14318f63fb8b74d0cb6e2ac8fad4978d488c1d6c79076a604004ebe30f"
+      "bytes": 38288,
+      "linhas": 849,
+      "sha256": "a54245692767c78321fdbe963c4aca2817ec94b46f14c9f4c9b414985dc24205"
     },
     {
       "arquivo": "etl/pipeline.py",
-      "bytes": 12443,
-      "linhas": 322,
-      "sha256": "4746c1a38e6fc88daa5edbcfc347d543aff5ec24e99c3370357e4a25f4496b0e"
+      "bytes": 13717,
+      "linhas": 350,
+      "sha256": "922f28d9e9cccc15c54dc100ab1fff7fad2b938dbf90f8c82429a8403538b5d1"
     },
     {
       "arquivo": "etl/rede.py",
@@ -106,21 +106,21 @@
     },
     {
       "arquivo": "etl/serie.py",
-      "bytes": 8446,
-      "linhas": 225,
-      "sha256": "173385c22309207d277ac85570541b3ad9dd8c934d65341e113cddfd956c680a"
+      "bytes": 17522,
+      "linhas": 418,
+      "sha256": "1d838d1d040d6ebf89b2bf436e86e1c670fba144d909b2f17ce281713159773e"
     },
     {
       "arquivo": "site/build.py",
-      "bytes": 28325,
-      "linhas": 657,
-      "sha256": "ca53a6cae5f9973c438851d1b4358953540be502af856c0164218f94b4601562"
+      "bytes": 30591,
+      "linhas": 702,
+      "sha256": "f51bee706d7eddc5171177a57f13e1b5ee32e36de7ad86a38fd49c753d9db16b"
     },
     {
       "arquivo": "site/catalogo.py",
-      "bytes": 26135,
-      "linhas": 523,
-      "sha256": "981baea89915463ac7f1705de88db724ccc21a6f17b267db61ae4b371f4d86e0"
+      "bytes": 31032,
+      "linhas": 610,
+      "sha256": "a3ef5f00ede2f3439af562626c46569349acc54f8c37172c29df01c341f088d5"
     },
     {
       "arquivo": "site/estatistica.py",
@@ -172,9 +172,9 @@
     },
     {
       "arquivo": "site/templates/index.html.j2",
-      "bytes": 10304,
-      "linhas": 259,
-      "sha256": "8d94f96cbdd1ae16ed68f3811c6226596d9b669634fd7a616b2ce715b3de3ffa"
+      "bytes": 12953,
+      "linhas": 312,
+      "sha256": "bf0b9d6c9c3e9cdbadcf3caec089176ed26af9aefa8d932efb6a2667ed67f605"
     },
     {
       "arquivo": "site/templates/indice.html.j2",
@@ -232,9 +232,9 @@
     },
     {
       "arquivo": "tests/test_check_fontes.py",
-      "bytes": 6213,
-      "linhas": 179,
-      "sha256": "0d4d37a0c85c2d6d8c053d9f51e041aaa5d31ed1e6a3da113b3153284c9f12d4"
+      "bytes": 9009,
+      "linhas": 254,
+      "sha256": "875f03a75c753794542fa7466b9203ba2c346c890fa3ca30331e7951239d816b"
     },
     {
       "arquivo": "tests/test_conteudo_publicado.py",
@@ -256,9 +256,9 @@
     },
     {
       "arquivo": "tests/test_validacao.py",
-      "bytes": 20959,
-      "linhas": 480,
-      "sha256": "d690fede8984eab584f220e4c4462d438509e2f0bd7f4d468302f34818bbdcee"
+      "bytes": 34789,
+      "linhas": 786,
+      "sha256": "0d78a01a39f360057421fbaaf152ab9cd2f87d7a4c130db345053bf78b230e34"
     },
     {
       "arquivo": ".github/workflows/ci.yml",
