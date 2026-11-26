@@ -186,20 +186,38 @@ class _FluxoBlocos(io.RawIOBase):
     def __init__(self, gerador):
         self._gerador = gerador
         self._buffer = b""
+        # Cursor DENTRO do bloco, em vez de refatiar o bloco a cada leitura.
+        #
+        # A versão anterior fazia `self._buffer = self._buffer[n:]` depois de
+        # entregar n bytes — o que COPIA todo o resto do bloco. Os blocos aqui
+        # são grandes de propósito (8 MB comprimidos do ZIP viram perto de 60
+        # MB de CSV) e quem lê pede de 8 KB em 8 KB, então consumir um bloco
+        # custava ~7.500 cópias de ~60 MB: centenas de gigabytes de memcpy
+        # para mover 60 MB de dados úteis.
+        #
+        # O custo crescia com o QUADRADO do tamanho do bloco, e por isso não
+        # aparecia em arquivo pequeno: a tabela de local de oferta do Censo
+        # 2025, com 1,6 GB, levava horas; medido, o processo gastava 12 s de
+        # CPU a cada 30 s de parede sem ler um byte novo do disco.
+        self._pos = 0
         self._fim = False
 
     def readable(self):
         return True
 
     def readinto(self, destino):
-        while not self._buffer and not self._fim:
+        while self._pos >= len(self._buffer) and not self._fim:
             try:
                 self._buffer = next(self._gerador)
+                self._pos = 0
             except StopIteration:
                 self._fim = True
-        n = min(len(destino), len(self._buffer))
-        destino[:n] = self._buffer[:n]
-        self._buffer = self._buffer[n:]
+        disponivel = len(self._buffer) - self._pos
+        if disponivel <= 0:
+            return 0
+        n = min(len(destino), disponivel)
+        destino[:n] = self._buffer[self._pos:self._pos + n]
+        self._pos += n
         return n
 
 

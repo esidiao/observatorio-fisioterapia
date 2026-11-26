@@ -157,7 +157,7 @@ def _agregar_normalizado(z, ano, rotulo, alvo, alvo_ies):
             else:
                 d["vagas_em_extincao"] += vagas
             if formato == "1":
-                # ATIVO nos tres, e nao so nas vagas.
+                # ATIVO nos três, e não só nas vagas.
                 #
                 # A primeira versao contava curso e municipio sem olhar a
                 # situacao, e so as vagas separavam. O resultado foi um
@@ -166,14 +166,14 @@ def _agregar_normalizado(z, ano, rotulo, alvo, alvo_ies):
                 # o defeito que o comentario de `vagas_total` acima descreve,
                 # repetido quatro linhas abaixo dele.
                 #
-                # Esta funcao so le o esquema normalizado, de 2025 em
-                # diante. As edicoes anteriores passam pelo outro leitor, que
-                # nao tem coluna de situacao para olhar — nelas "curso
+                # Esta função só lê o esquema normalizado, de 2025 em
+                # diante. As edições anteriores passam pelo outro leitor, que
+                # não tem coluna de situação para olhar — nelas "curso
                 # presencial" sempre significou o que o cadastro trazia. A
-                # comparacao continua valendo porque o que mudou foi a fonte
-                # passar a declarar o que antes nao declarava; o curso
+                # comparação continua valendo porque o que mudou foi a fonte
+                # passar a declarar o que antes não declarava; o curso
                 # encerrado de 2025 em diante conta em `n_cursos_em_extincao`,
-                # na pagina.
+                # na página.
                 if situacao == "1":
                     d["n_cursos_presencial"] += 1
                     d["vagas_presencial"] += vagas

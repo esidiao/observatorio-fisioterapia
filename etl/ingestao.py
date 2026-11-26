@@ -600,11 +600,25 @@ def agregar_normalizado(cursos, locais, alunos, ies, mun_por_uf,
     polos_mun_por_uf = defaultdict(set)
     polos_ext_por_uf = defaultdict(set)
     polos_ext_mun_por_uf = defaultdict(set)
+    # Polo que a fonte não localiza: contado e declarado, nunca atribuído.
+    #
+    # Antes a linha caía num `continue` sem contador, e o total nacional
+    # (que é a soma das UFs) ficava alguns polos abaixo das linhas da fonte,
+    # sem nada explicando a diferença. Um polo é por definição um ENDEREÇO:
+    # se a fonte não diz onde é, não há o que inferir — ao contrário da oferta
+    # a distância sem endereço, que é atribuída à UF-sede porque não tem
+    # endereço por natureza.
+    polos_sem_uf = {True: set(), False: set()}
     for linha in locais:
         if (linha.get("IN_LOCAL_OFERTA_POLO") or "").strip() != "1":
             continue
         uf = (linha.get("SG_UF_LO") or "").strip().upper()
+        cod_curso_sem_uf = (linha.get("CO_CURSO") or "").strip()
         if uf not in ufs:
+            if formato_do_curso.get(cod_curso_sem_uf) != FORMATO_PRESENCIAL:
+                polos_sem_uf[
+                    situacao_do_curso.get(cod_curso_sem_uf) == SITUACAO_ATIVIDADE
+                ].add((linha.get("CO_LOCAL_OFERTA") or "").strip())
             continue
         cod_curso = (linha.get("CO_CURSO") or "").strip()
         # Polo de curso presencial nao e alcance de oferta a distancia.
@@ -639,6 +653,12 @@ def agregar_normalizado(cursos, locais, alunos, ies, mun_por_uf,
     # ler o numero da UF tem direito de saber que parte dele chegou ali por
     # inferencia.
     sem_localizacao["atribuidas_pela_sede_da_ies"] = por_ies
+    # Publicado mesmo quando é zero: campo que só aparece quando há problema
+    # ensina o leitor a não procurá-lo.
+    sem_localizacao["polos_sem_uf"] = {
+        "ativos": len(polos_sem_uf[True]),
+        "em_extincao": len(polos_sem_uf[False]),
+    }
     _fechar(ufs, vagas_ies, vagas_mantenedora)
     return ufs, _fechar_municipios(municipios, nomes_municipio), sem_localizacao
 

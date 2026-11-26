@@ -8,8 +8,8 @@
     "obra": "Observatório Nacional da Formação em Fisioterapia",
     "descricao": "Sítio estático data-driven com indicadores de acesso territorial, qualidade e cobertura assistencial dos cursos de Fisioterapia no Brasil: formulação e cálculo dos índices ICT, E, IAF, ICAFT e ICRE, catálogo de indicadores, textos e desenho editorial."
   },
-  "registrado_em": "2026-11-26T19:26:10+00:00",
-  "git_commit_ancora": "9ae42477768f8e44d51fa61dfc2eaf1a814a4143",
+  "registrado_em": "2026-11-26T23:38:48+00:00",
+  "git_commit_ancora": "0181a42ffc5fb63ea39822d04beb623467af4503",
   "algoritmo": "SHA-256 sobre o conteúdo com fim de linha normalizado em LF",
   "fundamento": "Lei 9.610/1998 (direitos autorais) e Lei 9.609/1998 (programa de computador). O resumo combinado é impressão digital única do conjunto; o commit Git ancora a data no histórico versionado.",
   "como_verificar": [
@@ -23,14 +23,14 @@
   "natureza": "Declaração datada de conteúdo, com anterioridade ancorada no histórico do repositório. Permite comparar uma cópia com o original arquivo a arquivo. Não é registro em cartório nem depósito no INPI, e não substitui nenhum dos dois.",
   "escopo": "Apenas material autoral: código, textos, templates e o desenho dos índices. Não inclui os dados públicos (INEP, DATASUS, IBGE), que pertencem às respectivas fontes, nem bibliotecas de terceiros.",
   "n_arquivos": 40,
-  "bytes_totais": 544912,
-  "sha256_combinado": "b36d5d273a68de67532c7d56b6b33f8fdcc0ed661ff4ee25586c56213b22f6fc",
+  "bytes_totais": 564731,
+  "sha256_combinado": "cfaf98b088acdfb2acd77e0e6544bb8aa34203f73ae8ec35a9059db6ee04e2e7",
   "arquivos": [
     {
       "arquivo": "README.md",
-      "bytes": 15836,
-      "linhas": 326,
-      "sha256": "91b30a2d2fdf092ab5ddcaccd59061a88bc54d8eb24603a01e242d718ca09f82"
+      "bytes": 20580,
+      "linhas": 391,
+      "sha256": "a0c60dc0d4854f6b5b2cd6c7a534844a4569eada7dee50866a46c43653b49d8a"
     },
     {
       "arquivo": "SECURITY.md",
@@ -58,9 +58,9 @@
     },
     {
       "arquivo": "etl/extrair_censo.py",
-      "bytes": 25076,
-      "linhas": 566,
-      "sha256": "f139a26aebb35436ccbfc616f4168121ec2016e9567894deffcb96f1e5ef62be"
+      "bytes": 33244,
+      "linhas": 729,
+      "sha256": "8cf7047899cc0da4bf514590afba5b77c6226877bf5f505e8a6c9e270a3090eb"
     },
     {
       "arquivo": "etl/extrair_cnes.py",
@@ -82,21 +82,21 @@
     },
     {
       "arquivo": "etl/ingestao.py",
-      "bytes": 38288,
-      "linhas": 849,
-      "sha256": "a54245692767c78321fdbe963c4aca2817ec94b46f14c9f4c9b414985dc24205"
+      "bytes": 39428,
+      "linhas": 869,
+      "sha256": "7037a27bc4fdf4daa047ea427f49c19ed3eea4f735dbca23dce9007bf6d8420c"
     },
     {
       "arquivo": "etl/pipeline.py",
-      "bytes": 13717,
-      "linhas": 350,
-      "sha256": "922f28d9e9cccc15c54dc100ab1fff7fad2b938dbf90f8c82429a8403538b5d1"
+      "bytes": 13967,
+      "linhas": 354,
+      "sha256": "e716d858ba5f0fca35a43035fcb7be8493e52be99fbd3f2e8116d088cecff943"
     },
     {
       "arquivo": "etl/rede.py",
-      "bytes": 19895,
-      "linhas": 506,
-      "sha256": "81592a237afc07288b5be0a721f562a29c8c8dc9415092e6cbf3541ed8b751ba"
+      "bytes": 22111,
+      "linhas": 557,
+      "sha256": "c9a4f7b3d1632a3082ad93bb70935bc28dcd7d01ab129c6533b39afcab1d7df3"
     },
     {
       "arquivo": "etl/registro_autoral.py",
@@ -106,9 +106,9 @@
     },
     {
       "arquivo": "etl/serie.py",
-      "bytes": 17522,
-      "linhas": 418,
-      "sha256": "1d838d1d040d6ebf89b2bf436e86e1c670fba144d909b2f17ce281713159773e"
+      "bytes": 20823,
+      "linhas": 470,
+      "sha256": "f34455972c7b684807c70ab70411a0855f6da354b2e0f4a3d42f46dc82c7ca24"
     },
     {
       "arquivo": "site/build.py",

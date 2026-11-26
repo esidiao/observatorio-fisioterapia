@@ -23,7 +23,7 @@ Compartilha o método e o design system; não compartilha código, dados nem dep
 | Polos da rede em extinção | 28.950 registros em 3.429 municípios |
 | Matrículas / concluintes / ingressos | 254.789 / 25.313 / 116.412 |
 | Matrículas em curso em extinção | 103.118 — e 62.330 pessoas **ingressaram** neste ano |
-| IES distintas | 838 |
+| IES distintas | 780 — a soma por UF dá 838, e conta oito vezes quem atua em oito estados |
 | Cursos avaliados no CPC 2023 | 711, em **todas** as 27 UFs |
 
 ### O Censo 2025 mudou de forma, não só de número
@@ -53,7 +53,7 @@ formato em que ingressou.
 ### A escala muda o que as páginas precisam dizer
 
 Este é o maior curso de saúde da família de observatórios: 711 cursos avaliados
-contra 74 da Fonoaudiologia e 452 da Odontologia. Quatro consequências não são
+contra 74 da Fonoaudiologia e 452 da Odontologia. Cinco consequências não são
 escolha editorial, são imposição do dado.
 
 **Não existe seção de "UF sem oferta".** A Fonoaudiologia precisa dela — Amapá,
@@ -72,6 +72,15 @@ que a lei acabou.
 presencial em 396 municípios e polo da rede ativa em 3.006 — quase oito vezes mais. Os dois
 números vão juntos de propósito: publicar só o presencial subestimaria o alcance, e
 publicar só o total esconderia que quase todo esse alcance não é presencial.
+
+**Polo que a fonte não localiza é contado e declarado.** Vinte e nove polos
+ativos e setenta e cinco em extinção vêm sem `SG_UF_LO`. Antes caíam num
+`continue` sem contador, e o total nacional — que é a soma das UFs — ficava
+alguns polos abaixo das linhas da fonte, sem nada explicando a diferença. Agora
+saem em `metadados.sem_localizacao.polos_sem_uf`. Não são atribuídos a UF
+nenhuma: um polo é por definição um endereço, e se a fonte não diz onde é, não
+há o que inferir — ao contrário da oferta a distância, que não tem endereço por
+natureza.
 
 **Polo não é uma população só, são três.** A soma ingênua por endereço dá 29.921 polos
 em 3.438 municípios, misturando a rede EaD em extinção (28.950), a rede semipresencial

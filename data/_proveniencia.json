@@ -19,15 +19,16 @@
       "fatias_reaproveitadas": true,
       "linhas_curso": 1076,
       "linhas_local_oferta": 44617,
-      "linhas_aluno_nivel_curso": 844,
+      "linhas_aluno_nivel_curso": 1076,
       "aluno_niveis_na_fatia": {
-        "2": 844
+        "2": 1076
       },
       "aluno_niveis_na_fonte": null,
       "aluno_nivel_usado": "2",
       "aluno_nivel_nota": "A tabela de aluno conta a MESMA pessoa em três níveis de agregação (1 IES, 2 curso, 3 local de oferta). Só o nível 2 é lido; somar a tabela inteira triplicaria o país. No nível 3 o INEP suprime contagens de até três por proteção de dado pessoal, então perfil por local de oferta teria buraco nos lugares pequenos.",
       "ies_cadastradas": 2550,
-      "extraido_em": "2026-11-26"
+      "extraido_em": "2026-11-26",
+      "lido_de": "INEP por Range"
     },
     "cpc": {
       "presente": true,
@@ -40,7 +41,7 @@
       "componente_q_do_iaf": "CPC (Faixa), escala 1 a 5",
       "cursos_avaliados": 711,
       "ufs_avaliadas": 27,
-      "extraido_em": "2026-11-23"
+      "extraido_em": "2026-11-26"
     },
     "cnes": {
       "presente": true,
@@ -72,7 +73,7 @@
       "servico_criterio_sus": "A rede especializada conta estabelecimentos que ofertam o serviço AO SUS (CO_AMBULATORIAL_SUS ou CO_HOSPITALAR_SUS = 1). O total declarado, que inclui a clínica privada, sai no campo *_total: serviço declarado no cadastro não é serviço público.",
       "st_ativo_sn_nao_filtra": "A coluna ST_ATIVO_SN de rlEstabServClass vem vazia em todas as linhas deste export, então não há como excluir serviço marcado como inativo. O filtro que existia aqui lia coluna sempre em branco e nunca excluiu nada; agora a ausência é contada e declarada em vez de passar por filtro que funciona.",
       "cer_indisponivel": "A habilitação de Centro Especializado em Reabilitação não é publicada nesta base: os códigos existem em tbSubGruposHabilitacao (2208-2211, 8223-8225) mas nenhuma tabela-fato os liga a estabelecimento ou município. O indicador de CER não existe e não foi substituído por proxy.",
-      "extraido_em": "2026-11-23",
+      "extraido_em": "2026-11-26",
       "diagnostico": {
         "vinculos_fisioterapia": 199825,
         "vinculos_em_estabelecimento_desabilitado": 145,

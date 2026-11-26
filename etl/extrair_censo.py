@@ -301,6 +301,39 @@ def extrair(ano, rotulo, rebaixar=False, espelho=None):
                           origem=origem)
 
 
+def _cache_vale(caminho, prov_anterior, campo, rebaixar):
+    """
+    Quantas linhas a fatia tem, se ela puder ser reaproveitada — ou `None`.
+
+    EXISTIR NÃO BASTA, E ISSO NÃO É ZELO EXCESSIVO.
+
+    Uma extração deste projeto caiu no último passo depois de gravar as tabelas
+    pesadas, e a fatia de aluno ficou em disco TRUNCADA, escrita por uma versão
+    anterior à gravação atômica. A execução seguinte viu o arquivo, aceitou
+    como cache e seguiu: 844 dos 1.076 cursos do recorte, um prefixo da tabela.
+    Nada falhou, nenhum total ficou absurdo, e os percentuais de perfil foram
+    publicados sobre 78% dos cursos.
+
+    Então o que autoriza o reaproveitamento é a PROVENIÊNCIA da última execução
+    completa — que é escrita por último, depois de todas as fatias, e portanto é
+    a declaração de que a passada inteira terminou. O número declarado tem de
+    bater com o que está no arquivo; divergência significa relê.
+    """
+    if rebaixar or not caminho.exists():
+        return None
+    declarado = prov_anterior.get(campo)
+    if not isinstance(declarado, int):
+        print(f"[CENSO] {caminho.name} existe, mas nenhuma execução completa "
+              f"declarou `{campo}` — relendo em vez de confiar no arquivo.")
+        return None
+    em_disco = _linhas(caminho)
+    if em_disco != declarado:
+        print(f"[CENSO] {caminho.name} tem {em_disco} linhas e a proveniência "
+              f"declara {declarado} — fatia inconsistente, relendo.")
+        return None
+    return em_disco
+
+
 def _linhas(caminho):
     """Quantas linhas de dado a fatia tem (sem o cabeçalho)."""
     with open(caminho, encoding="utf-8", newline="") as f:
@@ -323,15 +356,33 @@ def _niveis_da_fatia(caminho):
     return niveis
 
 
-def _fatiar(z, alvo, destino, rotulo, encoding, extra=None, rotulo_coluna="NO_CINE_ROTULO"):
+def _fatiar(z, alvo, destino, rotulo, encoding, extra=None,
+            rotulo_coluna="NO_CINE_ROTULO", extra_coluna=None):
     """
     Copia para `destino` só as linhas do rótulo pedido, lendo em fluxo.
 
-    `extra` é um filtro adicional (linha -> bool). Devolve (lidas, escritas,
-    descartadas_pelo_extra).
+    `extra` é um filtro adicional que recebe o VALOR de `extra_coluna` naquela
+    linha (não a linha inteira). Devolve (lidas, escritas, descartadas_pelo_extra).
+
+    POR QUE NÃO `DictReader`
+    ------------------------
+    A tabela de local de oferta tem 78 colunas e milhões de linhas; a de aluno
+    tem 284. `DictReader` monta um dicionário por linha — uma chave por coluna
+    — para que daqui se leia UMA célula, e `DictWriter` o desmonta de volta.
+    Medido nesta máquina, com quatro extrações da família em paralelo, o custo
+    projetava cinco horas por observatório, com o disco parado: o gargalo era
+    parsing, não leitura.
+
+    Com `csv.reader` a linha é uma tupla, o índice da coluna do rótulo é achado
+    uma vez, e a normalização é MEMORIZADA por valor cru — o Censo tem algumas
+    centenas de rótulos distintos, então ela roda umas centenas de vezes em vez
+    de milhões. A saída é a mesma: mesmo dialeto, mesma ordem de colunas.
     """
     alvo_norm = normalizar(rotulo)
     lidas = escritas = barradas = 0
+    # Normalização memorizada: NFD + filtro de acento + regex por linha era o
+    # segundo custo por linha, para comparar um rótulo que se repete.
+    normalizados = {}
     # Escreve em `.parcial` e renomeia no fim.
     #
     # Sem isso, uma queda no meio de uma tabela de 1,6 GB deixa em disco um
@@ -340,21 +391,42 @@ def _fatiar(z, alvo, destino, rotulo, encoding, extra=None, rotulo_coluna="NO_CI
     # e pior que ausente: continua plausivel.
     parcial = destino.with_suffix(destino.suffix + ".parcial")
     with z.membro_arquivo(alvo, encoding=encoding) as f:
-        leitor = csv.DictReader(f, delimiter=";")
-        campos = leitor.fieldnames or []
+        leitor = csv.reader(f, delimiter=";")
+        campos = next(leitor, None)
+        if not campos:
+            raise SystemExit(f"[ERRO] {alvo} veio vazio")
         if rotulo_coluna not in campos:
             raise SystemExit(
                 f"[ERRO] coluna {rotulo_coluna} ausente em {alvo}")
+        i_rotulo = campos.index(rotulo_coluna)
+        i_extra = campos.index(extra_coluna) if extra_coluna else None
+        if extra is not None and i_extra is None:
+            raise SystemExit(
+                "[ERRO] filtro extra sem coluna declarada: quem filtra tem de "
+                "dizer por qual coluna, senão a linha inteira voltaria a ser "
+                "montada só para isso")
+        largura = len(campos)
         with open(parcial, "w", encoding="utf-8", newline="") as saida:
-            escritor = csv.DictWriter(saida, fieldnames=campos, delimiter=";")
-            escritor.writeheader()
+            escritor = csv.writer(saida, delimiter=";")
+            escritor.writerow(campos)
             for linha in leitor:
                 lidas += 1
                 if lidas % 2_000_000 == 0:
                     print(f"      {lidas:,} linhas lidas...".replace(",", "."))
-                if normalizar(linha.get(rotulo_coluna) or "") != alvo_norm:
+                if len(linha) != largura:
+                    # Linha com número de colunas diferente do cabeçalho não é
+                    # filtrada em silêncio: ou o arquivo está corrompido, ou o
+                    # dialeto está errado, e as duas coisas invalidam a fatia.
+                    raise SystemExit(
+                        f"[ERRO] linha {lidas} de {alvo} tem {len(linha)} "
+                        f"colunas, e o cabeçalho tem {largura}")
+                cru = linha[i_rotulo]
+                norm = normalizados.get(cru)
+                if norm is None:
+                    norm = normalizados[cru] = normalizar(cru)
+                if norm != alvo_norm:
                     continue
-                if extra is not None and not extra(linha):
+                if extra is not None and not extra(linha[i_extra]):
                     barradas += 1
                     continue
                 escritor.writerow(linha)
@@ -390,15 +462,30 @@ def _extrair_normalizado(z, url, ano, rotulo, alvo_curso, alvo_ies,
     enc_curso = codificacao_do_membro(z, alvo_curso)
     destino = DADOS / f"curso_{slug(rotulo)}_{ano}.csv"
 
+    # A proveniencia da ultima execucao COMPLETA e o que autoriza reaproveitar
+    # fatia. Ver `_cache_vale`: existir nao basta, porque arquivo truncado
+    # tambem existe.
+    prov_anterior = {}
+    caminho_prov = DADOS / f"_censo_{ano}.json"
+    if caminho_prov.exists():
+        try:
+            prov_anterior = json.loads(caminho_prov.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            prov_anterior = {}
+    if prov_anterior.get("rotulo_cine") and \
+            normalizar(prov_anterior["rotulo_cine"]) != normalizar(rotulo):
+        # Proveniencia de outro recorte nao diz nada sobre estas fatias.
+        prov_anterior = {}
+
     print(f"[CENSO] {url}")
     print(f"[CENSO] rótulo exato: {rotulo!r}  (codificação: {enc_curso})")
     print(f"[CENSO] curso: {alvo_curso.split('/')[-1]}")
 
-    if destino.exists() and not rebaixar:
-        escritas = _linhas(destino)
-        lidas = None
-        print(f"[CENSO] {destino.name} já em disco ({escritas} linhas) — "
-              "pulando. Use --rebaixar para reler.")
+    escritas = _cache_vale(destino, prov_anterior, "linhas_curso", rebaixar)
+    lidas = None
+    if escritas is not None:
+        print(f"[CENSO] {destino.name} já em disco e declarado completo "
+              f"({escritas} linhas) — pulando. Use --rebaixar para reler.")
     else:
         lidas, escritas, _ = _fatiar(z, alvo_curso, destino, rotulo, enc_curso)
         print(f"[CENSO] {lidas} cursos no país, {escritas} do rótulo exato "
@@ -413,10 +500,11 @@ def _extrair_normalizado(z, url, ano, rotulo, alvo_curso, alvo_ies,
     # Local de oferta: é a tabela maior do pacote (1,6 GB em 2025).
     alvo_local = z.localizar("tabela_local_oferta", ".csv")
     destino_local = DADOS / f"local_oferta_{slug(rotulo)}_{ano}.csv"
-    if destino_local.exists() and not rebaixar:
-        escritas_lo = _linhas(destino_local)
-        print(f"[CENSO] {destino_local.name} já em disco ({escritas_lo} "
-              "linhas) — pulando a tabela de 1,6 GB.")
+    escritas_lo = _cache_vale(destino_local, prov_anterior,
+                              "linhas_local_oferta", rebaixar)
+    if escritas_lo is not None:
+        print(f"[CENSO] {destino_local.name} já em disco e declarado completo "
+              f"({escritas_lo} linhas) — pulando a tabela de 1,6 GB.")
     else:
         print(f"[CENSO] local de oferta: {alvo_local.split('/')[-1]} "
               f"({z.indice()[alvo_local]['usz'] / 1048576:.0f} MB, leitura em fluxo)")
@@ -431,23 +519,25 @@ def _extrair_normalizado(z, url, ano, rotulo, alvo_curso, alvo_ies,
     destino_aluno = DADOS / f"aluno_{slug(rotulo)}_{ano}.csv"
     niveis = {}
 
-    def so_nivel_curso(linha):
-        nivel = (linha.get("TP_NIVEL_AGREGACAO") or "").strip()
+    def so_nivel_curso(valor):
+        nivel = (valor or "").strip()
         niveis[nivel] = niveis.get(nivel, 0) + 1
         return nivel == NIVEL_CURSO
 
     niveis_na_fonte = None
-    if destino_aluno.exists() and not rebaixar:
-        escritas_al = _linhas(destino_aluno)
+    escritas_al = _cache_vale(destino_aluno, prov_anterior,
+                              "linhas_aluno_nivel_curso", rebaixar)
+    if escritas_al is not None:
         niveis = _niveis_da_fatia(destino_aluno)
-        print(f"[CENSO] {destino_aluno.name} já em disco ({escritas_al} "
-              "linhas) — pulando a tabela de 796 MB.")
+        print(f"[CENSO] {destino_aluno.name} já em disco e declarado completo "
+              f"({escritas_al} linhas) — pulando a tabela de 796 MB.")
     else:
         print(f"[CENSO] aluno: {alvo_aluno.split('/')[-1]} "
               f"({z.indice()[alvo_aluno]['usz'] / 1048576:.0f} MB, leitura em fluxo)")
         lidas_al, escritas_al, barradas_al = _fatiar(
             z, alvo_aluno, destino_aluno, rotulo,
-            codificacao_do_membro(z, alvo_aluno), extra=so_nivel_curso)
+            codificacao_do_membro(z, alvo_aluno), extra=so_nivel_curso,
+            extra_coluna="TP_NIVEL_AGREGACAO")
         niveis_na_fonte = dict(niveis)
         niveis = _niveis_da_fatia(destino_aluno)
         print(f"[CENSO] {lidas_al} linhas de aluno, {escritas_al} do recorte no "
