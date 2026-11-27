@@ -55,10 +55,25 @@ VAGAS_TOTAL_ATIVA = 272855       # presencial + semipresencial
 # atendem. Polo de curso presencial não entra em nenhum dos dois — a fonte
 # marca 471 endereços de curso presencial como polo, e contá-los como
 # alcance de oferta a distância seria inflar o país.
-POLOS_REGISTROS = 14158          # rede ativa (semipresencial)
+POLOS_REGISTROS = 14143          # rede ativa (semipresencial)
 POLOS_MUNICIPIOS = 3006
-POLOS_EM_EXTINCAO = 28950        # rede que está sendo desmontada
+POLOS_EM_EXTINCAO = 28930        # rede que está sendo desmontada
 POLOS_EM_EXTINCAO_MUNICIPIOS = 3429
+
+# Duas formas de a fonte não dizer o que é um polo, as duas contadas e
+# declaradas em vez de absorvidas:
+#
+#   sem UF       polo é por definição um endereço; se a fonte não diz onde é,
+#                não há o que inferir, e atribuir pela mantenedora inventaria
+#                localização.
+#   sem código   o `CO_LOCAL_OFERTA` vazio entrava no conjunto de locais como
+#                se fosse um local, e todas as linhas sem código de uma mesma
+#                UF colapsavam em UM polo que não existe. O município delas,
+#                que é conhecido, continua contando no alcance.
+POLOS_SEM_UF_ATIVOS = 29
+POLOS_SEM_UF_EM_EXTINCAO = 75
+POLOS_SEM_CODIGO_ATIVOS = 27
+POLOS_SEM_CODIGO_EM_EXTINCAO = 94
 
 # Pessoas NÃO se filtram por situação: quem está matriculado agora existe, e
 # tem direito a concluir no formato em que ingressou.
@@ -221,9 +236,37 @@ def test_composicao_da_capacidade_ativa():
 
 
 def test_polos_ead():
+    """
+    As três populações de polo, e as duas formas de a fonte não dizer o que é
+    um polo.
+
+    A bandeira de polo marca, na mesma tabela, a rede de curso em extinção, a
+    de curso ativo não presencial e o endereço de curso PRESENCIAL. Somar as
+    três publica um alcance que não corresponde a rede nenhuma.
+    """
     ufs = _ler("nacional.json")["ufs"]
-    assert _soma(ufs, "ead_polos_registros") == POLOS_REGISTROS
+    assert _soma(ufs, "ead_polos_registros") == POLOS_REGISTROS, (
+        f"polos da rede ativa: esperado {POLOS_REGISTROS}, veio "
+        f"{_soma(ufs, 'ead_polos_registros')}")
     assert _soma(ufs, "ead_polos_municipios") == POLOS_MUNICIPIOS
+    assert _soma(ufs, "polos_em_extincao") == POLOS_EM_EXTINCAO, (
+        f"polos da rede em extinção: esperado {POLOS_EM_EXTINCAO}, veio "
+        f"{_soma(ufs, 'polos_em_extincao')}")
+    assert (_soma(ufs, "polos_em_extincao_municipios")
+            == POLOS_EM_EXTINCAO_MUNICIPIOS)
+
+    sl = _ler("bruto.json")["metadados"].get("sem_localizacao") or {}
+    sem_uf = sl.get("polos_sem_uf") or {}
+    assert sem_uf.get("ativos") == POLOS_SEM_UF_ATIVOS, (
+        f"polos ativos sem UF: esperado {POLOS_SEM_UF_ATIVOS}, veio "
+        f"{sem_uf.get('ativos')}")
+    assert sem_uf.get("em_extincao") == POLOS_SEM_UF_EM_EXTINCAO
+    sem_codigo = ((_ler("bruto.json")["metadados"].get("sem_localizacao") or {})
+                  .get("polos_sem_codigo") or {})
+    assert sem_codigo.get("ativos") == POLOS_SEM_CODIGO_ATIVOS, (
+        f"linhas de polo ativo sem código de local: esperado "
+        f"{POLOS_SEM_CODIGO_ATIVOS}, veio {sem_codigo.get('ativos')}")
+    assert sem_codigo.get("em_extincao") == POLOS_SEM_CODIGO_EM_EXTINCAO
 
 
 def test_fluxo():

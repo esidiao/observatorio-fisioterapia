@@ -19,8 +19,8 @@ Compartilha o método e o design system; não compartilha código, dados nem dep
 | Vagas **a distância em atividade** | **0** — encerradas pelo Decreto 12.456/2025 |
 | Vagas em cursos encerrados ou em extinção | 302.594, publicadas **ao lado** da capacidade |
 | **% da capacidade ativa não presencial** | **35,0%** |
-| Polos da rede ativa | 14.158 registros em 3.006 municípios |
-| Polos da rede em extinção | 28.950 registros em 3.429 municípios |
+| Polos da rede ativa | 14.143 locais em 3.006 municípios |
+| Polos da rede em extinção | 28.930 locais em 3.429 municípios |
 | Matrículas / concluintes / ingressos | 254.789 / 25.313 / 116.412 |
 | Matrículas em curso em extinção | 103.118 — e 62.330 pessoas **ingressaram** neste ano |
 | IES distintas | 780 — a soma por UF dá 838, e conta oito vezes quem atua em oito estados |
@@ -73,14 +73,20 @@ presencial em 396 municípios e polo da rede ativa em 3.006 — quase oito vezes
 números vão juntos de propósito: publicar só o presencial subestimaria o alcance, e
 publicar só o total esconderia que quase todo esse alcance não é presencial.
 
-**Polo que a fonte não localiza é contado e declarado.** Vinte e nove polos
-ativos e setenta e cinco em extinção vêm sem `SG_UF_LO`. Antes caíam num
-`continue` sem contador, e o total nacional — que é a soma das UFs — ficava
-alguns polos abaixo das linhas da fonte, sem nada explicando a diferença. Agora
-saem em `metadados.sem_localizacao.polos_sem_uf`. Não são atribuídos a UF
-nenhuma: um polo é por definição um endereço, e se a fonte não diz onde é, não
-há o que inferir — ao contrário da oferta a distância, que não tem endereço por
-natureza.
+**A fonte deixa de dizer o que é um polo de dois jeitos, e os dois são
+declarados.** Vinte e nove polos ativos e setenta e cinco em extinção vêm sem
+`SG_UF_LO`: caíam num `continue` sem contador, e o total nacional — que é a soma
+das UFs — ficava alguns polos abaixo das linhas da fonte, sem nada explicando a
+diferença. Não são atribuídos a UF nenhuma, porque polo é por definição um
+endereço e não há o que inferir — ao contrário da oferta a distância, que não
+tem endereço por natureza.
+
+Outras 121 linhas vêm **sem `CO_LOCAL_OFERTA`**, e essas tinham o pior
+tratamento possível: o código vazio entrava no conjunto de locais como se fosse
+um local, então todas as linhas sem código de uma mesma UF colapsavam em **um
+polo inventado por UF** — vinte deles. Agora a identidade não é inventada nem
+colapsada, o município delas (que é conhecido) continua contando no alcance, e
+as duas contagens saem em `metadados.sem_localizacao`.
 
 **Polo não é uma população só, são três.** A soma ingênua por endereço dá 29.921 polos
 em 3.438 municípios, misturando a rede EaD em extinção (28.950), a rede semipresencial
